@@ -61,7 +61,7 @@ void MiniJJMoogAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     filterEnv.setSampleRate(currentSampleRate);
     ampEnv.setSampleRate(currentSampleRate);
 
-    juce::dsp::ProcessSpec spec { currentSampleRate, static_cast<juce::uint32>(samplesPerBlock), 2 };
+    juce::dsp::ProcessSpec spec { currentSampleRate, static_cast<juce::uint32>(samplesPerBlock), 1 };
     ladderFilter.prepare(spec);
     ladderFilter.reset();
 }
@@ -244,7 +244,11 @@ void MiniJJMoogAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         ladderFilter.setCutoffFrequencyHz(cutoffHz);
         ladderFilter.setResonance(emphasis);
 
-        const float outSample = ladderFilter.processSample(mixSat) * aEnv * masterVol;
+        float sampleData[1] = { mixSat };
+        juce::dsp::AudioBlock<float> block(&sampleData[0], 1, 1);
+        ladderFilter.process(juce::dsp::ProcessContextReplacing<float>(block));
+
+        const float outSample = sampleData[0] * aEnv * masterVol;
         leftOut[sample] = outSample;
         if (rightOut != nullptr)
             rightOut[sample] = outSample;
