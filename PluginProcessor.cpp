@@ -1,12 +1,11 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <cmath>
 
 MiniJJMoogAudioProcessor::MiniJJMoogAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "PARAMS", createParameterLayout())
 {
-    ladderFilter.setMode(juce::dsp::LadderFilterMode::LPF24);
-    ladderFilter.setDrive(1.25f);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::createParameterLayout()
@@ -55,15 +54,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     return { params.begin(), params.end() };
 }
 
-void MiniJJMoogAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void MiniJJMoogAudioProcessor::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     filterEnv.setSampleRate(currentSampleRate);
     ampEnv.setSampleRate(currentSampleRate);
-
-    juce::dsp::ProcessSpec spec { currentSampleRate, static_cast<juce::uint32>(samplesPerBlock), 1 };
-    ladderFilter.prepare(spec);
-    ladderFilter.reset();
+    filterStage1 = filterStage2 = filterStage3 = filterStage4 = 0.0f;
 }
 
 bool MiniJJMoogAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -241,14 +237,17 @@ void MiniJJMoogAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         const float cutoffHz = juce::jlimit(30.0f, 18000.0f,
             cutoffBase + (fEnv * contourAmt) + (modWheelNorm * modSource * 1800.0f));
 
-        ladderFilter.setCutoffFrequencyHz(cutoffHz);
-        ladderFilter.setResonance(emphasis);
+        const float fc = juce::jlimit(0.001f, 0.45f, static_cast<float>(cutoffHz / currentSampleRate));
+        const float g = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi * fc);
+        const float k = emphasis * 3.85f;
+        const float filterInput = std::tanh(mixSat * 1.25f - k * filterStage4);
 
-        float sampleData[1] = { mixSat };
-        juce::dsp::AudioBlock<float> block(&sampleData[0], 1, 1);
-        ladderFilter.process(juce::dsp::ProcessContextReplacing<float>(block));
+        filterStage1 += g * (std::tanh(filterInput) - std::tanh(filterStage1));
+        filterStage2 += g * (std::tanh(filterStage1) - std::tanh(filterStage2));
+        filterStage3 += g * (std::tanh(filterStage2) - std::tanh(filterStage3));
+        filterStage4 += g * (std::tanh(filterStage3) - std::tanh(filterStage4));
 
-        const float outSample = sampleData[0] * aEnv * masterVol;
+        const float outSample = filterStage4 * aEnv * masterVol;
         leftOut[sample] = outSample;
         if (rightOut != nullptr)
             rightOut[sample] = outSample;
