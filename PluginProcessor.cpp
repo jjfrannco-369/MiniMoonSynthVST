@@ -244,17 +244,13 @@ void MiniJJMoogAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         ladderFilter.setCutoffFrequencyHz(cutoffHz);
         ladderFilter.setResonance(emphasis);
-
-        float tempSample = mixSat;
-        juce::dsp::AudioBlock<float> block(&tempSample, 1, 1);
-        ladderFilter.process(juce::dsp::ProcessContextReplacing<float>(block));
-
-        const float outSample = tempSample * aEnv * masterVol;
+       
+        const float outSample = ladderFilter.processSample(mixSat) * aEnv * masterVol;
         leftOut[sample] = outSample;
         if (rightOut != nullptr)
             rightOut[sample] = outSample;
-    }
-}
+       
+     }
 
 juce::AudioProcessorEditor* MiniJJMoogAudioProcessor::createEditor()
 {
