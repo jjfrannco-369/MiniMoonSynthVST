@@ -1,4 +1,3 @@
-
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
@@ -244,13 +243,13 @@ void MiniJJMoogAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         ladderFilter.setCutoffFrequencyHz(cutoffHz);
         ladderFilter.setResonance(emphasis);
-       
+
         const float outSample = ladderFilter.processSample(mixSat) * aEnv * masterVol;
         leftOut[sample] = outSample;
         if (rightOut != nullptr)
             rightOut[sample] = outSample;
-       
-     }
+    }
+}
 
 juce::AudioProcessorEditor* MiniJJMoogAudioProcessor::createEditor()
 {
