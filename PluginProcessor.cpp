@@ -296,6 +296,7 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     heldNotes.clear();
     currentMidiNote = 60;
     gateHeld = false;
+    filterEnvStage = EnvStage::idle;
     filterEnvValue = 0.0f;
     loudnessEnvValue = 0.0f;
 }
@@ -373,11 +374,11 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                 }
 
                 gateHeld = true;
+                filterEnvStage = EnvStage::attack;
 
                 const bool isLegatoSlide = legatoMode && (hadHeldNotes || sustainPedalDown);
                 if (! isLegatoSlide)
                 {
-                    filterEnvValue = std::max (filterEnvValue, 0.25f);
                     loudnessEnvValue = std::max (loudnessEnvValue, 0.25f);
                 }
             }
@@ -403,6 +404,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                 else if (! sustainPedalDown)
                 {
                     gateHeld = false;
+                    filterEnvStage = EnvStage::release;
                 }
             }
         }
@@ -425,7 +427,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
                 if (! sustainPedalDown)
                 {
-                    // Ao soltar o pedal de sustain, encerra vozes cujas teclas ja foram soltas
                     for (auto& v : voices)
                     {
                         if (! v.noteKeyHeld)
@@ -433,7 +434,10 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                     }
 
                     if (heldNotes.empty())
+                    {
                         gateHeld = false;
+                        filterEnvStage = EnvStage::release;
+                    }
                 }
             }
         }
@@ -447,6 +451,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             }
             sustainPedalDown = false;
             gateHeld = false;
+            filterEnvStage = EnvStage::release;
             noteVelocity = 0.0f;
         }
     }
@@ -524,6 +529,49 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         lfoPhase += lfoHz / currentSampleRate;
         if (lfoPhase >= 1.0) lfoPhase -= 1.0;
 
+        // Envelope de filtro com Decay ativo mesmo com a tecla pressionada
+        if (! envGateActive && filterEnvStage != EnvStage::idle)
+            filterEnvStage = EnvStage::release;
+
+        switch (filterEnvStage)
+        {
+            case EnvStage::attack:
+                filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
+                if (filterEnvValue >= 0.99f)
+                {
+                    filterEnvValue = 1.0f;
+                    filterEnvStage = EnvStage::decay;
+                }
+                break;
+
+            case EnvStage::decay:
+                filterEnvValue += fDecCoeff * (fSus - filterEnvValue);
+                if (std::abs (filterEnvValue - fSus) < 0.002f)
+                {
+                    filterEnvValue = fSus;
+                    filterEnvStage = EnvStage::sustain;
+                }
+                break;
+
+            case EnvStage::sustain:
+                filterEnvValue += fDecCoeff * 0.25f * (fSus - filterEnvValue);
+                break;
+
+            case EnvStage::release:
+                filterEnvValue += fDecCoeff * (0.0f - filterEnvValue);
+                if (filterEnvValue < 0.0005f)
+                {
+                    filterEnvValue = 0.0f;
+                    filterEnvStage = EnvStage::idle;
+                }
+                break;
+
+            case EnvStage::idle:
+            default:
+                filterEnvValue = 0.0f;
+                break;
+        }
+
         const float white = rng.nextFloat() * 2.0f - 1.0f;
         pinkB0 = 0.99886f * pinkB0 + white * 0.0555179f;
         pinkB1 = 0.99332f * pinkB1 + white * 0.0750759f;
@@ -536,7 +584,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         const float noiseSample = (noiseType == 1) ? pink : white;
 
         float rawSynthSample = 0.0f;
-        float activeEnvForFilter = 0.0f;
 
         if (! isPoly)
         {
@@ -544,19 +591,9 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             const double glidedFreqHz = 440.0 * std::pow (2.0, (currentMidiPitch - 69.0) / 12.0);
 
             if (envGateActive)
-            {
-                filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
                 loudnessEnvValue += lAtkCoeff * (1.0f - loudnessEnvValue);
-            }
             else
-            {
-                filterEnvValue += fDecCoeff * (0.0f - filterEnvValue);
                 loudnessEnvValue += lDecCoeff * (0.0f - loudnessEnvValue);
-            }
-
-            activeEnvForFilter = envGateActive
-                ? (filterEnvValue * (1.0f - fDecCoeff * 0.35f) + fSus * (fDecCoeff * 0.35f))
-                : filterEnvValue;
 
             const float ampLevel = envGateActive
                 ? (loudnessEnvValue * (1.0f - lDecCoeff * 0.25f) + lSus * (lDecCoeff * 0.25f))
@@ -605,8 +642,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                     ? (v.envLevel * (1.0f - lDecCoeff * 0.20f) + lSus * (lDecCoeff * 0.20f))
                     : v.envLevel;
 
-                activeEnvForFilter = std::max (activeEnvForFilter, voiceAmp);
-
                 const float modPitchSemis = oscModOn ? (lfoWave * effectiveModDepth * 2.5f) : 0.0f;
                 const float totalSemisOffset = tuneSemis + bendSemis + modPitchSemis;
 
@@ -636,7 +671,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         const float saturated = std::tanh (rawSynthSample * driveGain);
 
         const float kbOffset = kbCtrlOn ? ((static_cast<float> (currentMidiNote) - 60.0f) * 24.0f) : 0.0f;
-        const float contourHz = activeEnvForFilter * filterContour * 5500.0f;
+        const float contourHz = filterEnvValue * filterContour * 5500.0f;
         const float lfoCutoffHz = filterModOn ? (lfoWave * effectiveModDepth * 2600.0f) : 0.0f;
         const float finalCutoff = juce::jlimit (35.0f, 16000.0f, baseCutoff + kbOffset + contourHz + lfoCutoffHz);
 
