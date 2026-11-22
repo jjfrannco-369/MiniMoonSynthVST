@@ -71,9 +71,9 @@ private:
     uint64_t voiceAgeTick = 0;
 
     std::array<SynthVoice, maxPolyVoices> voices;
+    std::array<double, 3> oscPhases { 0.0, 0.0, 0.0 };
     double lfoPhase = 0.0;
 
-    // Estado monofonico (tambem usado quando voiceCount == 1)
     double targetMidiPitch = 60.0;
     double currentMidiPitch = 60.0;
     float pitchBendNorm = 0.0f;
