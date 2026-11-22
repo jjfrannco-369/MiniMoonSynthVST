@@ -50,11 +50,11 @@ private:
     MiniMoonLookAndFeel miniMoonLookAndFeel;
 
     // CONTROLLERS
-    juce::Slider tuneSlider, glideSlider, pbRangeSlider, modMixSlider;
-    juce::Label tuneLabel, glideLabel, pbRangeLabel, modMixLabel;
+    juce::Slider tuneSlider, glideSlider, pbRangeSlider, modMixSlider, lfoRateSlider;
+    juce::Label tuneLabel, glideLabel, pbRangeLabel, modMixLabel, lfoRateLabel;
     juce::ComboBox voiceModeBox;
     juce::Label voiceModeLabel;
-    juce::ToggleButton oscModBtn, osc3CtrlBtn, legatoBtn;
+    juce::ToggleButton oscModBtn, osc3CtrlBtn, legatoBtn, retriggerBtn;
 
     // OSCILLATOR BANK
     juce::ComboBox osc1RangeBox, osc1WaveBox, osc2RangeBox, osc2WaveBox, osc3RangeBox, osc3WaveBox;
@@ -69,7 +69,8 @@ private:
     juce::Label noiseColorLabel;
 
     // MODIFIERS
-    juce::ToggleButton filterModBtn, kbCtrlBtn;
+    juce::ToggleButton filterModBtn, kbTrk1Btn, kbTrk2Btn, kbTrk3Btn;
+    juce::Label kbTrackLabel;
     juce::Slider cutoffSlider, emphasisSlider, contourSlider;
     juce::Label cutoffLabel, emphasisLabel, contourLabel;
     juce::Slider fAtkSlider, fDecSlider, fSusSlider;
@@ -83,9 +84,9 @@ private:
     juce::ToggleButton mainOutBtn;
 
     // Attachments
-    std::unique_ptr<SliderAttachment> tuneAtt, glideAtt, pbRangeAtt, modMixAtt;
+    std::unique_ptr<SliderAttachment> tuneAtt, glideAtt, pbRangeAtt, modMixAtt, lfoRateAtt;
     std::unique_ptr<ComboAttachment> voiceModeAtt;
-    std::unique_ptr<ButtonAttachment> oscModAtt, osc3CtrlAtt, legatoAtt;
+    std::unique_ptr<ButtonAttachment> oscModAtt, osc3CtrlAtt, legatoAtt, retriggerAtt;
 
     std::unique_ptr<ComboAttachment> osc1RangeAtt, osc1WaveAtt, osc2RangeAtt, osc2WaveAtt, osc3RangeAtt, osc3WaveAtt;
     std::unique_ptr<SliderAttachment> osc1FreqAtt, osc2FreqAtt, osc3FreqAtt;
@@ -93,7 +94,7 @@ private:
     std::unique_ptr<SliderAttachment> osc1VolAtt, osc2VolAtt, osc3VolAtt, noiseVolAtt, extVolAtt, overloadAtt;
     std::unique_ptr<ComboAttachment> noiseColorAtt;
 
-    std::unique_ptr<ButtonAttachment> filterModAtt, kbCtrlAtt;
+    std::unique_ptr<ButtonAttachment> filterModAtt, kbTrk1Att, kbTrk2Att, kbTrk3Att;
     std::unique_ptr<SliderAttachment> cutoffAtt, emphasisAtt, contourAtt;
     std::unique_ptr<SliderAttachment> fAtkAtt, fDecAtt, fSusAtt;
     std::unique_ptr<SliderAttachment> lAtkAtt, lDecAtt, lSusAtt;
