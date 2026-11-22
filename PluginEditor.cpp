@@ -9,45 +9,58 @@ void MiniMoonLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int
 {
     const float w = static_cast<float> (width);
     const float h = static_cast<float> (height);
-    const float baseR = std::max (8.0f, std::min (w, h) * 0.42f);
+    const float baseR = std::max (8.0f, std::min (w, h) * 0.40f);
     const float cx = static_cast<float> (x) + w * 0.5f;
     const float cy = static_cast<float> (y) + h * 0.5f;
 
-    // Marcas de escala ao redor do knob (estilo analógico tradicional)
+    // Marcas de escala radiais em volta do knob
     const int numTicks = 11;
     for (int i = 0; i < numTicks; ++i)
     {
         const float t = static_cast<float> (i) / static_cast<float> (numTicks - 1);
         const float ang = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle) - juce::MathConstants<float>::halfPi;
-        const float r1 = baseR + 1.5f;
-        const float r2 = baseR + 5.0f;
-        g.setColour (juce::Colour (0xffa89e8c));
-        g.drawLine (cx + std::cos (ang) * r1,
-                    cy + std::sin (ang) * r1,
-                    cx + std::cos (ang) * r2,
-                    cy + std::sin (ang) * r2, 1.0f);
+        const float rTick1 = baseR + 2.0f;
+        const float rTick2 = baseR + 5.5f;
+        g.setColour (juce::Colour (0xffb2a792));
+        g.drawLine (cx + std::cos (ang) * rTick1,
+                    cy + std::sin (ang) * rTick1,
+                    cx + std::cos (ang) * rTick2,
+                    cy + std::sin (ang) * rTick2, 1.1f);
     }
 
-    // Saia / base escura com borda fina
-    g.setColour (juce::Colour (0xff262523));
-    g.fillEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f);
-    g.setColour (juce::Colour (0xff6b6354));
-    g.drawEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f, 1.0f);
+    // Sombra projetada 3D
+    g.setColour (juce::Colour (0x99050506));
+    g.fillEllipse (cx - baseR + 2.0f, cy - baseR + 3.0f, baseR * 2.0f, baseR * 2.0f);
 
-    // Corpo do knob (sem arco colorido moderno)
+    // Saia / base escura com gradiente de relevo
+    juce::ColourGradient skirtGrad (juce::Colour (0xff383530), cx, cy - baseR,
+                                  juce::Colour (0xff161513), cx, cy + baseR, false);
+    g.setGradientFill (skirtGrad);
+    g.fillEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f);
+
+    g.setColour (juce::Colour (0xff7c7058));
+    g.drawEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f, 1.1f);
+
+    // Corpo / tampa 3D do knob
     const float capR = baseR * 0.72f;
-    g.setColour (juce::Colour (0xff121214));
+    juce::ColourGradient capGrad (juce::Colour (0xff2b2926), cx - capR * 0.3f, cy - capR * 0.4f,
+                                juce::Colour (0xff0c0c0d), cx + capR * 0.3f, cy + capR * 0.4f, false);
+    g.setGradientFill (capGrad);
     g.fillEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f);
-    g.setColour (juce::Colour (0xff47433c));
+
+    g.setColour (juce::Colour (0xff5c5548));
     g.drawEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f, 1.0f);
 
-    // Ponteiro indicador clássico (linha branca do centro até a borda do cap)
+    // Ponteiro indicador clássico com realce 3D
     const float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle)
                         - juce::MathConstants<float>::halfPi;
-    const float px = cx + std::cos (angle) * (capR * 0.92f);
-    const float py = cy + std::sin (angle) * (capR * 0.92f);
+    const float px = cx + std::cos (angle) * (capR * 0.90f);
+    const float py = cy + std::sin (angle) * (capR * 0.90f);
 
-    g.setColour (juce::Colour (0xfff5f2eb));
+    g.setColour (juce::Colour (0x88000000));
+    g.drawLine (cx + 1.0f, cy + 1.0f, px + 1.0f, py + 1.0f, 2.5f);
+
+    g.setColour (juce::Colour (0xfff7f4ed));
     g.drawLine (cx, cy, px, py, 2.2f);
 }
 
@@ -57,23 +70,47 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
     const bool isOn = button.getToggleState();
     auto bounds = button.getLocalBounds().toFloat();
 
-    const float swW = 28.0f;
-    const float swH = 16.0f;
-    const float swX = bounds.getX() + 2.0f;
-    const float swY = bounds.getCentreY() - swH * 0.5f;
+    // Chave metalica vintage
+    const float metalW = 24.0f;
+    const float metalH = 16.0f;
+    const float metalX = bounds.getX() + 2.0f;
+    const float metalY = bounds.getCentreY() - metalH * 0.5f;
 
-    g.setColour (juce::Colour (0xff0b0b0c));
-    g.fillRoundedRectangle (swX, swY, swW, swH, 3.0f);
-    g.setColour (juce::Colour (0xff6e6552));
-    g.drawRoundedRectangle (swX, swY, swW, swH, 3.0f, 1.0f);
+    juce::ColourGradient metalGrad (juce::Colour (0xffc9c3b8), metalX, metalY,
+                                   juce::Colour (0xff58544e), metalX, metalY + metalH, false);
+    g.setGradientFill (metalGrad);
+    g.fillRoundedRectangle (metalX, metalY, metalW, metalH, 2.5f);
+    g.setColour (juce::Colour (0xff2b2926));
+    g.drawRoundedRectangle (metalX, metalY, metalW, metalH, 2.5f, 1.0f);
 
-    const float leverX = isOn ? (swX + swW * 0.52f) : (swX + 2.0f);
-    const float leverW = swW * 0.44f;
-    g.setColour (isOn ? juce::Colour (0xffd6b36a) : juce::Colour (0xff8c867b));
-    g.fillRoundedRectangle (leverX, swY + 2.0f, leverW, swH - 4.0f, 2.0f);
+    const float tabX = isOn ? (metalX + metalW - 8.0f) : (metalX + 2.0f);
+    g.setColour (juce::Colour (0xffeae6de));
+    g.fillRoundedRectangle (tabX, metalY + 2.0f, 6.0f, metalH - 4.0f, 1.5f);
 
-    auto textRect = bounds.withTrimmedLeft (swW + 8.0f);
-    g.setColour (isOn ? juce::Colour (0xfff2d79b) : juce::Colour (0xffcfc7b8));
+    // LED sob lente plastica anos 60/70 ao lado da chave
+    const float ledR = 5.0f;
+    const float ledCx = metalX + metalW + 10.0f;
+    const float ledCy = bounds.getCentreY();
+
+    // Tampa / bezel plastico da lente
+    g.setColour (juce::Colour (0xff2c2924));
+    g.fillEllipse (ledCx - ledR - 1.5f, ledCy - ledR - 1.5f, (ledR + 1.5f) * 2.0f, (ledR + 1.5f) * 2.0f);
+
+    if (isOn)
+    {
+        g.setColour (juce::Colour (0xffffb838));
+        g.fillEllipse (ledCx - ledR, ledCy - ledR, ledR * 2.0f, ledR * 2.0f);
+        g.setColour (juce::Colour (0xffffeab8));
+        g.fillEllipse (ledCx - ledR * 0.45f, ledCy - ledR * 0.55f, ledR * 0.5f, ledR * 0.45f);
+    }
+    else
+    {
+        g.setColour (juce::Colour (0xff3a2414));
+        g.fillEllipse (ledCx - ledR, ledCy - ledR, ledR * 2.0f, ledR * 2.0f);
+    }
+
+    auto textRect = bounds.withTrimmedLeft (ledCx + ledR + 7.0f);
+    g.setColour (isOn ? juce::Colour (0xfff4d68c) : juce::Colour (0xffd6cfc2));
     g.setFont (juce::Font (10.5f, juce::Font::bold));
     g.drawFittedText (button.getButtonText(), textRect.toNearestInt(), juce::Justification::centredLeft, 1);
 }
@@ -183,7 +220,7 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     masterVolAtt  = std::make_unique<SliderAttachment> (tree, "master_vol", masterVolSlider);
     mainOutAtt    = std::make_unique<ButtonAttachment> (tree, "main_out_on", mainOutBtn);
 
-    setSize (1020, 450);
+    setSize (1140, 430);
 }
 
 MiniJJMoogAudioProcessorEditor::~MiniJJMoogAudioProcessorEditor()
@@ -194,30 +231,31 @@ MiniJJMoogAudioProcessorEditor::~MiniJJMoogAudioProcessorEditor()
 void MiniJJMoogAudioProcessorEditor::setupKnob (juce::Slider& slider, juce::Label& label, const juce::String& text)
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 52, 14);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 50, 14);
     slider.setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xffe8e2d5));
-    slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0xff232220));
+    slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0xff1d1c1a));
+    slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colour (0xff4d473c));
     addAndMakeVisible (slider);
 
     label.setText (text, juce::dontSendNotification);
     label.setJustificationType (juce::Justification::centred);
     label.setColour (juce::Label::textColourId, juce::Colour (0xffe8e2d5));
-    label.setFont (juce::Font (10.5f, juce::Font::bold));
+    label.setFont (juce::Font (10.0f, juce::Font::bold));
     addAndMakeVisible (label);
 }
 
 void MiniJJMoogAudioProcessorEditor::setupCombo (juce::ComboBox& box, juce::Label& label, const juce::String& text, const juce::StringArray& items)
 {
     box.addItemList (items, 1);
-    box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff22211e));
+    box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff1e1d1b));
     box.setColour (juce::ComboBox::textColourId, juce::Colour (0xffe8e2d5));
-    box.setColour (juce::ComboBox::outlineColourId, juce::Colour (0xff7a7468));
+    box.setColour (juce::ComboBox::outlineColourId, juce::Colour (0xff6b6252));
     addAndMakeVisible (box);
 
     label.setText (text, juce::dontSendNotification);
     label.setJustificationType (juce::Justification::centred);
     label.setColour (juce::Label::textColourId, juce::Colour (0xffe8e2d5));
-    label.setFont (juce::Font (10.0f, juce::Font::bold));
+    label.setFont (juce::Font (9.5f, juce::Font::bold));
     addAndMakeVisible (label);
 }
 
@@ -229,37 +267,47 @@ void MiniJJMoogAudioProcessorEditor::setupToggle (juce::ToggleButton& btn, const
 
 void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff4a2912));
-    g.setColour (juce::Colour (0xff6e3f1d));
-    g.fillRect (0, 0, getWidth(), 6);
-    g.setColour (juce::Colour (0xff2c1708));
-    g.fillRect (0, getHeight() - 6, getWidth(), 6);
+    // Madeira rica com veios sutis e relevo de gabinete
+    juce::ColourGradient woodGrad (juce::Colour (0xff5c3518), 0.0f, 0.0f,
+                                   juce::Colour (0xff361d0b), 0.0f, static_cast<float> (getHeight()), false);
+    g.setGradientFill (woodGrad);
+    g.fillAll();
 
-    auto panel = getLocalBounds().reduced (14, 14).toFloat();
+    g.setColour (juce::Colour (0xff7a4722));
+    g.fillRect (0, 0, getWidth(), 5);
+    g.setColour (juce::Colour (0xff241206));
+    g.fillRect (0, getHeight() - 5, getWidth(), 5);
+
+    auto panel = getLocalBounds().reduced (14, 12).toFloat();
     g.setColour (juce::Colour (0xff121214));
     g.fillRoundedRectangle (panel, 5.0f);
 
     g.setColour (juce::Colour (0xff8c7d5b));
     g.drawRoundedRectangle (panel, 5.0f, 1.5f);
 
-    const float screwOffsetsX[2] = { panel.getX() + 8.0f, panel.getRight() - 8.0f };
-    const float screwOffsetsY[2] = { panel.getY() + 8.0f, panel.getBottom() - 8.0f };
-    for (float sx : screwOffsetsX)
+    const float screwX[2] = { panel.getX() + 9.0f, panel.getRight() - 9.0f };
+    const float screwY[2] = { panel.getY() + 9.0f, panel.getBottom() - 9.0f };
+    for (float sx : screwX)
     {
-        for (float sy : screwOffsetsY)
+        for (float sy : screwY)
         {
-            g.setColour (juce::Colour (0xff58544c));
+            g.setColour (juce::Colour (0xff666157));
             g.fillEllipse (sx - 3.5f, sy - 3.5f, 7.0f, 7.0f);
-            g.setColour (juce::Colour (0xff1a1917));
+            g.setColour (juce::Colour (0xff191816));
             g.drawLine (sx - 2.0f, sy, sx + 2.0f, sy, 1.0f);
         }
     }
 
-    auto header = panel.removeFromTop (28.0f);
+    // Cabecalho sem caracteres especiais quebrados
     g.setColour (juce::Colour (0xffd6b36a));
-    g.setFont (juce::Font (17.0f, juce::Font::bold));
-    g.drawText ("MINI MOON - ANALOG SYNTHESIZER", header.reduced (18, 0), juce::Justification::centredLeft);
+    g.setFont (juce::Font (15.5f, juce::Font::bold));
+    g.drawText ("MINI MOON - ANALOG SYNTHESIZER",
+                juce::roundToInt (panel.getX() + 20.0f),
+                juce::roundToInt (panel.getY() + 3.0f),
+                360, 20, juce::Justification::centredLeft);
 
+    const float secStartY = panel.getY() + 24.0f;
+    const float secHeight = panel.getHeight() - 28.0f;
     const float secW = panel.getWidth() / 5.0f;
     const juce::StringArray secTitles { "CONTROLLERS", "OSCILLATOR BANK", "MIXER", "MODIFIERS", "OUTPUT" };
 
@@ -268,14 +316,14 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
         const float colX = panel.getX() + static_cast<float> (i) * secW;
         if (i > 0)
         {
-            g.setColour (juce::Colour (0xff3c3a36));
-            g.drawLine (colX, panel.getY() + 4.0f, colX, panel.getBottom() - 4.0f, 1.0f);
+            g.setColour (juce::Colour (0xff383632));
+            g.drawLine (colX, secStartY + 2.0f, colX, secStartY + secHeight - 4.0f, 1.0f);
         }
         g.setColour (juce::Colour (0xffb8a472));
-        g.setFont (juce::Font (11.0f, juce::Font::bold));
+        g.setFont (juce::Font (10.5f, juce::Font::bold));
         g.drawText (secTitles[i],
                     juce::roundToInt (colX + 4.0f),
-                    juce::roundToInt (panel.getY() + 2.0f),
+                    juce::roundToInt (panel.getY() + 3.0f),
                     juce::roundToInt (secW - 8.0f),
                     16,
                     juce::Justification::centred);
@@ -284,22 +332,22 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
 
 void MiniJJMoogAudioProcessorEditor::resized()
 {
-    const auto panel = getLocalBounds().reduced (14, 14);
-    const int topBar = 22;
+    const auto panel = getLocalBounds().reduced (14, 12);
+    const int topBar = 24;
     const int secW = panel.getWidth() / 5;
-    const int secH = panel.getHeight() - topBar;
+    const int secH = panel.getHeight() - topBar - 4;
 
     auto placeKnob = [] (juce::Slider& s, juce::Label& l, int x, int y, int w, int h)
     {
-        l.setBounds (x, y, w, 14);
-        s.setBounds (x, y + 14, w, std::max (20, h - 14));
+        l.setBounds (x + 2, y, std::max (16, w - 4), 14);
+        s.setBounds (x + 2, y + 14, std::max (16, w - 4), std::max (24, h - 14));
     };
 
     auto placeCombo = [] (juce::ComboBox& b, juce::Label& l, int x, int y, int w, int h)
     {
         juce::ignoreUnused (h);
-        l.setBounds (x, y, w, 14);
-        b.setBounds (x + 4, y + 14, std::max (24, w - 8), 22);
+        l.setBounds (x + 2, y, std::max (16, w - 4), 14);
+        b.setBounds (x + 4, y + 15, std::max (28, w - 8), 22);
     };
 
     // 1. CONTROLLERS
@@ -307,33 +355,38 @@ void MiniJJMoogAudioProcessorEditor::resized()
         const int x0 = panel.getX();
         const int y0 = panel.getY() + topBar;
         const int kw = secW / 2;
-        const int kh = 84;
+        const int kh = 80;
         placeKnob   (tuneSlider, tuneLabel, x0, y0, kw, kh);
         placeKnob   (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
         placeKnob   (pbRangeSlider, pbRangeLabel, x0, y0 + kh, kw, kh);
         placeKnob   (modMixSlider, modMixLabel, x0 + kw, y0 + kh, kw, kh);
-        oscModBtn.setBounds   (x0 + 6, y0 + kh * 2 + 8, kw - 10, 22);
-        osc3CtrlBtn.setBounds (x0 + kw + 4, y0 + kh * 2 + 8, kw - 8, 22);
-        legatoBtn.setBounds   (x0 + 6, y0 + kh * 2 + 34, secW - 12, 22);
+
+        const int by = y0 + kh * 2 + 6;
+        oscModBtn.setBounds   (x0 + 8, by, kw - 10, 22);
+        osc3CtrlBtn.setBounds (x0 + kw + 4, by, kw - 10, 22);
+        legatoBtn.setBounds   (x0 + 8, by + 26, kw - 10, 22);
     }
 
-    // 2. OSCILLATOR BANK
+    // 2. OSCILLATOR BANK (Osc 1, 2 e 3 empilhados um abaixo do outro)
     {
         const int x0 = panel.getX() + secW;
         const int y0 = panel.getY() + topBar;
         const int rowH = secH / 3;
-        const int c1 = static_cast<int> (static_cast<float> (secW) * 0.30f);
+        const int c1 = static_cast<int> (static_cast<float> (secW) * 0.28f);
         const int c2 = static_cast<int> (static_cast<float> (secW) * 0.32f);
         const int c3 = secW - c1 - c2;
 
+        // Linha 1: OSC 1
         placeCombo (osc1RangeBox, osc1RangeLabel, x0, y0, c1, rowH);
         placeKnob  (osc1FreqSlider, osc1FreqLabel, x0 + c1, y0, c2, rowH);
         placeCombo (osc1WaveBox, osc1WaveLabel, x0 + c1 + c2, y0, c3, rowH);
 
+        // Linha 2: OSC 2
         placeCombo (osc2RangeBox, osc2RangeLabel, x0, y0 + rowH, c1, rowH);
         placeKnob  (osc2FreqSlider, osc2FreqLabel, x0 + c1, y0 + rowH, c2, rowH);
         placeCombo (osc2WaveBox, osc2WaveLabel, x0 + c1 + c2, y0 + rowH, c3, rowH);
 
+        // Linha 3: OSC 3
         placeCombo (osc3RangeBox, osc3RangeLabel, x0, y0 + rowH * 2, c1, rowH);
         placeKnob  (osc3FreqSlider, osc3FreqLabel, x0 + c1, y0 + rowH * 2, c2, rowH);
         placeCombo (osc3WaveBox, osc3WaveLabel, x0 + c1 + c2, y0 + rowH * 2, c3, rowH);
@@ -344,7 +397,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
         const int x0 = panel.getX() + secW * 2;
         const int y0 = panel.getY() + topBar;
         const int kw = secW / 2;
-        const int kh = 88;
+        const int kh = 84;
         placeKnob  (osc1VolSlider, osc1VolLabel, x0, y0, kw, kh);
         placeKnob  (osc2VolSlider, osc2VolLabel, x0 + kw, y0, kw, kh);
         placeKnob  (osc3VolSlider, osc3VolLabel, x0, y0 + kh, kw, kh);
@@ -359,10 +412,10 @@ void MiniJJMoogAudioProcessorEditor::resized()
         const int x0 = panel.getX() + secW * 3;
         const int y0 = panel.getY() + topBar;
         const int kw = secW / 3;
-        const int kh = 88;
+        const int kh = 84;
 
-        filterModBtn.setBounds (x0 + 6, y0 + 10, kw - 8, 24);
-        kbCtrlBtn.setBounds (x0 + 6, y0 + 38, kw - 8, 24);
+        filterModBtn.setBounds (x0 + 6, y0 + 10, kw - 8, 22);
+        kbCtrlBtn.setBounds    (x0 + 6, y0 + 36, kw - 8, 22);
         placeKnob (contourSlider, contourLabel, x0 + kw, y0, kw, kh);
         placeKnob (cutoffSlider, cutoffLabel, x0 + kw * 2, y0, kw, kh);
 
@@ -381,7 +434,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
     {
         const int x0 = panel.getX() + secW * 4;
         const int y0 = panel.getY() + topBar;
-        placeKnob   (masterVolSlider, masterVolLabel, x0 + 16, y0 + 12, secW - 32, 110);
-        mainOutBtn.setBounds (x0 + 24, y0 + 135, secW - 48, 28);
+        placeKnob   (masterVolSlider, masterVolLabel, x0 + 16, y0 + 14, secW - 32, 110);
+        mainOutBtn.setBounds (x0 + 28, y0 + 138, secW - 56, 26);
     }
 }
