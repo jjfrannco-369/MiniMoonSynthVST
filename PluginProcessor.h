@@ -42,21 +42,38 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
 private:
+    static constexpr int maxPolyVoices = 16;
+
+    struct SynthVoice
+    {
+        bool active = false;
+        int midiNote = 60;
+        float velocity = 0.0f;
+        double targetPitch = 60.0;
+        double currentPitch = 60.0;
+        float envLevel = 0.0f;
+        uint64_t ageCounter = 0;
+        std::array<double, 3> phases { 0.0, 0.0, 0.0 };
+    };
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    static int voiceModeToCount (int modeIndex);
     static float rangeToOctaveMultiplier (int rangeIndex);
     static float semitonesToRatio (float semitones);
     static float renderWaveform (double normPhase, int waveIndex, float pulseWidth);
     static float secondsToCoeff (float seconds, double sampleRate);
 
-    void updateTargetFromHeldNotes();
+    void triggerPolyNoteOn (int noteNumber, float vel, int activeVoiceCount, bool legatoMode);
+    void triggerPolyNoteOff (int noteNumber);
 
     double currentSampleRate = 44100.0;
+    uint64_t voiceAgeTick = 0;
 
-    std::array<double, 3> oscPhases { 0.0, 0.0, 0.0 };
+    std::array<SynthVoice, maxPolyVoices> voices;
     double lfoPhase = 0.0;
 
-    // Glide exponencial simetrico em semitons MIDI (A4 = 69 -> 440 Hz)
+    // Estado monofonico (tambem usado quando voiceCount == 1)
     double targetMidiPitch = 60.0;
     double currentMidiPitch = 60.0;
     float pitchBendNorm = 0.0f;
