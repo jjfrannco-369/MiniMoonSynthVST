@@ -14,6 +14,7 @@ MiniJJMoogAudioProcessor::MiniJJMoogAudioProcessor()
                       ),
       apvts (*this, nullptr, "Parameters", createParameterLayout())
 {
+    heldNotes.reserve (16);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::createParameterLayout()
@@ -28,7 +29,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "tune", "Tune", juce::NormalisableRange<float> (-12.0f, 12.0f, 0.05f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "glide", "Glide", juce::NormalisableRange<float> (0.0f, 2.5f, 0.005f, 0.45f), 0.12f));
+        "glide", "Glide", juce::NormalisableRange<float> (0.0f, 2.5f, 0.005f, 0.45f), 0.15f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "pitch_bend_range", "PB Range", juce::NormalisableRange<float> (1.0f, 24.0f, 1.0f), 12.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -38,9 +39,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "osc3_ctrl_on", "Osc 3 Ctrl", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        "legato_on", "Legato", false));
+        "legato_on", "Legato", true));
 
-    // OSCILLATOR BANK
+    // OSCILLATOR BANK (8' = 1.0x para A4 = 440 Hz)
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         "osc1_range", "Osc 1 Range", rangeChoices, 3));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -156,8 +157,35 @@ float MiniJJMoogAudioProcessor::renderWaveform (double normPhase, int waveIndex,
 
 float MiniJJMoogAudioProcessor::secondsToCoeff (float seconds, double sampleRate)
 {
-    const double clamped = std::max (0.001, static_cast<double> (seconds));
+    const double clamped = std::max (0.0005, static_cast<double> (seconds));
     return static_cast<float> (1.0 - std::exp (-1.0 / (clamped * sampleRate)));
+}
+
+void MiniJJMoogAudioProcessor::updateTargetFromHeldNotes()
+{
+    if (heldNotes.empty())
+        return;
+
+    // Se ha mais de uma nota pressionada: a nota mais alta (max) vence;
+    // quando a mais alta e solta, retorna para a nota mais grave (min) entre as restantes.
+    if (heldNotes.size() > 1)
+    {
+        const auto highestIt = std::max_element (heldNotes.begin(), heldNotes.end());
+        if (highestIt != heldNotes.end() && *highestIt != currentMidiNote)
+            currentMidiNote = *highestIt;
+        else
+        {
+            const auto lowestIt = std::min_element (heldNotes.begin(), heldNotes.end());
+            if (lowestIt != heldNotes.end())
+                currentMidiNote = *lowestIt;
+        }
+    }
+    else
+    {
+        currentMidiNote = heldNotes.front();
+    }
+
+    targetMidiPitch = static_cast<double> (currentMidiNote);
 }
 
 const juce::String MiniJJMoogAudioProcessor::getName() const { return "Mini Moon"; }
@@ -191,7 +219,8 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     pitchBendNorm = 0.0f;
     smoothedBendNorm = 0.0f;
     modWheelAmount = 0.0f;
-    activeHeldNotes = 0;
+    heldNotes.clear();
+    currentMidiNote = 60;
     gateHeld = false;
     filterEnvValue = 0.0f;
     loudnessEnvValue = 0.0f;
@@ -237,19 +266,33 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         const auto msg = metadata.getMessage();
         if (msg.isNoteOn())
         {
-            const bool overlappingNote = legatoMode && (activeHeldNotes > 0 || gateHeld);
+            const bool hadHeldNotes = ! heldNotes.empty();
+            const int noteNum = msg.getNoteNumber();
 
-            currentMidiNote = msg.getNoteNumber();
+            heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), noteNum), heldNotes.end());
+            heldNotes.push_back (noteNum);
+
             noteVelocity = std::max (0.15f, msg.getFloatVelocity());
-            targetMidiPitch = static_cast<double> (currentMidiNote);
 
-            if (! overlappingNote && ! gateHeld)
-                currentMidiPitch = targetMidiPitch;
+            if (heldNotes.size() == 1)
+            {
+                currentMidiNote = noteNum;
+                targetMidiPitch = static_cast<double> (currentMidiNote);
+                if (! hadHeldNotes && ! gateHeld)
+                    currentMidiPitch = targetMidiPitch;
+            }
+            else
+            {
+                // Nota mais alta tocada apos a primeira assume o alvo com glide
+                const int highestNote = *std::max_element (heldNotes.begin(), heldNotes.end());
+                currentMidiNote = highestNote;
+                targetMidiPitch = static_cast<double> (currentMidiNote);
+            }
 
-            activeHeldNotes++;
             gateHeld = true;
 
-            if (! overlappingNote)
+            const bool isLegatoSlide = legatoMode && hadHeldNotes;
+            if (! isLegatoSlide)
             {
                 filterEnvValue = std::max (filterEnvValue, 0.25f);
                 loudnessEnvValue = std::max (loudnessEnvValue, 0.25f);
@@ -257,9 +300,21 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         }
         else if (msg.isNoteOff())
         {
-            activeHeldNotes = std::max (0, activeHeldNotes - 1);
-            if (activeHeldNotes == 0 && msg.getNoteNumber() == currentMidiNote)
+            const int noteNum = msg.getNoteNumber();
+            heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), noteNum), heldNotes.end());
+
+            if (! heldNotes.empty())
+            {
+                // Ao soltar a nota mais alta, volta automaticamente para a nota mais grave segurada
+                const int lowestNote = *std::min_element (heldNotes.begin(), heldNotes.end());
+                currentMidiNote = lowestNote;
+                targetMidiPitch = static_cast<double> (currentMidiNote);
+                gateHeld = true;
+            }
+            else
+            {
                 gateHeld = false;
+            }
         }
         else if (msg.isPitchWheel())
         {
@@ -272,7 +327,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         }
         else if (msg.isAllNotesOff() || msg.isAllSoundOff())
         {
-            activeHeldNotes = 0;
+            heldNotes.clear();
             gateHeld = false;
             noteVelocity = 0.0f;
         }
@@ -327,13 +382,14 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float lAtkCoeff     = secondsToCoeff (lAtk, currentSampleRate);
     const float lDecCoeff     = secondsToCoeff (lDec, currentSampleRate);
 
+    // Glide exponencial simetrico em semitons (subida e descida com a mesma curva)
     const double glideTau = std::max (0.001, static_cast<double> (glideSec) / 3.0);
     const double expGlideStep = (glideSec <= 0.002f)
         ? 1.0
         : (1.0 - std::exp (-1.0 / (glideTau * currentSampleRate)));
 
-    // Suavizacao de ~8 ms para o Pitch Bend eliminar qualquer degrau discreto
-    const float bendSmoothCoeff = secondsToCoeff (0.008f, currentSampleRate);
+    // Suavizacao de ~2 ms para pitch bend rapido (ex.: Save a Prayer) sem degraus
+    const float bendSmoothCoeff = secondsToCoeff (0.002f, currentSampleRate);
 
     moogFilter.setResonance (0.707f + emphasis * 6.5f);
     const float driveGain = 1.0f + overloadAmt * 4.5f;
