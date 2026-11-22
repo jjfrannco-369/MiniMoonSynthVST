@@ -40,7 +40,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "legato_on", "Legato", false));
 
-    // OSCILLATOR BANK (padrao em 8' = 1.0x para manter A4 = 440 Hz exato)
+    // OSCILLATOR BANK
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         "osc1_range", "Osc 1 Range", rangeChoices, 3));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -117,12 +117,12 @@ float MiniJJMoogAudioProcessor::rangeToOctaveMultiplier (int rangeIndex)
 {
     switch (rangeIndex)
     {
-        case 0: return 0.125f; // LO
-        case 1: return 0.25f;  // 32'
-        case 2: return 0.5f;   // 16'
-        case 3: return 1.0f;   // 8' (padrao A4 = 440 Hz)
-        case 4: return 2.0f;   // 4'
-        case 5: return 4.0f;   // 2'
+        case 0: return 0.125f;
+        case 1: return 0.25f;
+        case 2: return 0.5f;
+        case 3: return 1.0f;
+        case 4: return 2.0f;
+        case 5: return 4.0f;
         default: return 1.0f;
     }
 }
@@ -189,6 +189,7 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     targetMidiPitch = 60.0;
     currentMidiPitch = 60.0;
     pitchBendNorm = 0.0f;
+    smoothedBendNorm = 0.0f;
     modWheelAmount = 0.0f;
     activeHeldNotes = 0;
     gateHeld = false;
@@ -262,7 +263,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         }
         else if (msg.isPitchWheel())
         {
-            // Pitch wheel MIDI: 0..16383, centro = 8192 -> [-1.0, +1.0]
             const double norm = (static_cast<double> (msg.getPitchWheelValue()) - 8192.0) / 8192.0;
             pitchBendNorm = static_cast<float> (juce::jlimit (-1.0, 1.0, norm));
         }
@@ -327,24 +327,27 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float lAtkCoeff     = secondsToCoeff (lAtk, currentSampleRate);
     const float lDecCoeff     = secondsToCoeff (lDec, currentSampleRate);
 
-    // Glide exponencial em semitons (tau = glideSec / 3.0 para atingir ~95% no tempo ajustado)
     const double glideTau = std::max (0.001, static_cast<double> (glideSec) / 3.0);
     const double expGlideStep = (glideSec <= 0.002f)
         ? 1.0
         : (1.0 - std::exp (-1.0 / (glideTau * currentSampleRate)));
+
+    // Suavizacao de ~8 ms para o Pitch Bend eliminar qualquer degrau discreto
+    const float bendSmoothCoeff = secondsToCoeff (0.008f, currentSampleRate);
 
     moogFilter.setResonance (0.707f + emphasis * 6.5f);
     const float driveGain = 1.0f + overloadAmt * 4.5f;
 
     const double lfoHz = 4.5;
     const float effectiveModDepth = juce::jlimit (0.0f, 1.5f, modMix + modWheelAmount * 0.65f);
-    const float bendSemis = pitchBendNorm * pbRangeSemis;
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        // Progressao exponencial em semitons
         currentMidiPitch += expGlideStep * (targetMidiPitch - currentMidiPitch);
         const double glidedFreqHz = 440.0 * std::pow (2.0, (currentMidiPitch - 69.0) / 12.0);
+
+        smoothedBendNorm += bendSmoothCoeff * (pitchBendNorm - smoothedBendNorm);
+        const float bendSemis = smoothedBendNorm * pbRangeSemis;
 
         const float lfoWave = static_cast<float> (std::sin (2.0 * juce::MathConstants<double>::pi * lfoPhase));
         lfoPhase += lfoHz / currentSampleRate;
