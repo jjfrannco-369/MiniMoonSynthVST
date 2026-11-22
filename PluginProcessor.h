@@ -43,6 +43,11 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     double currentSampleRate = 44100.0;
+    juce::dsp::StateVariableTPTFilter<float> lowpassFilter;
+    double phase = 0.0;
+    double currentFreqHz = 110.0;
+    float currentVelocity = 0.0f;
+    int currentMidiNote = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MiniJJMoogAudioProcessor)
 };
