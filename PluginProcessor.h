@@ -44,6 +44,15 @@ public:
 private:
     static constexpr int maxPolyVoices = 16;
 
+    enum class EnvStage
+    {
+        idle,
+        attack,
+        decay,
+        sustain,
+        release
+    };
+
     struct SynthVoice
     {
         bool active = false;
@@ -87,6 +96,7 @@ private:
     int currentMidiNote = 60;
     bool gateHeld = false;
 
+    EnvStage filterEnvStage = EnvStage::idle;
     float filterEnvValue = 0.0f;
     float loudnessEnvValue = 0.0f;
 
