@@ -1,19 +1,100 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <algorithm>
+#include <cmath>
+
+void MiniMoonLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
+                                              float sliderPosProportional, float rotaryStartAngle,
+                                              float rotaryEndAngle, juce::Slider&)
+{
+    const float w = static_cast<float> (width);
+    const float h = static_cast<float> (height);
+    const float baseR = std::max (8.0f, std::min (w, h) * 0.42f);
+    const float cx = static_cast<float> (x) + w * 0.5f;
+    const float cy = static_cast<float> (y) + h * 0.5f;
+
+    // Marcas de escala ao redor do knob (estilo analógico tradicional)
+    const int numTicks = 11;
+    for (int i = 0; i < numTicks; ++i)
+    {
+        const float t = static_cast<float> (i) / static_cast<float> (numTicks - 1);
+        const float ang = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle) - juce::MathConstants<float>::halfPi;
+        const float r1 = baseR + 1.5f;
+        const float r2 = baseR + 5.0f;
+        g.setColour (juce::Colour (0xffa89e8c));
+        g.drawLine (cx + std::cos (ang) * r1,
+                    cy + std::sin (ang) * r1,
+                    cx + std::cos (ang) * r2,
+                    cy + std::sin (ang) * r2, 1.0f);
+    }
+
+    // Saia / base escura com borda fina
+    g.setColour (juce::Colour (0xff262523));
+    g.fillEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f);
+    g.setColour (juce::Colour (0xff6b6354));
+    g.drawEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f, 1.0f);
+
+    // Corpo do knob (sem arco colorido moderno)
+    const float capR = baseR * 0.72f;
+    g.setColour (juce::Colour (0xff121214));
+    g.fillEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f);
+    g.setColour (juce::Colour (0xff47433c));
+    g.drawEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f, 1.0f);
+
+    // Ponteiro indicador clássico (linha branca do centro até a borda do cap)
+    const float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle)
+                        - juce::MathConstants<float>::halfPi;
+    const float px = cx + std::cos (angle) * (capR * 0.92f);
+    const float py = cy + std::sin (angle) * (capR * 0.92f);
+
+    g.setColour (juce::Colour (0xfff5f2eb));
+    g.drawLine (cx, cy, px, py, 2.2f);
+}
+
+void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
+                                            bool, bool)
+{
+    const bool isOn = button.getToggleState();
+    auto bounds = button.getLocalBounds().toFloat();
+
+    const float swW = 28.0f;
+    const float swH = 16.0f;
+    const float swX = bounds.getX() + 2.0f;
+    const float swY = bounds.getCentreY() - swH * 0.5f;
+
+    g.setColour (juce::Colour (0xff0b0b0c));
+    g.fillRoundedRectangle (swX, swY, swW, swH, 3.0f);
+    g.setColour (juce::Colour (0xff6e6552));
+    g.drawRoundedRectangle (swX, swY, swW, swH, 3.0f, 1.0f);
+
+    const float leverX = isOn ? (swX + swW * 0.52f) : (swX + 2.0f);
+    const float leverW = swW * 0.44f;
+    g.setColour (isOn ? juce::Colour (0xffd6b36a) : juce::Colour (0xff8c867b));
+    g.fillRoundedRectangle (leverX, swY + 2.0f, leverW, swH - 4.0f, 2.0f);
+
+    auto textRect = bounds.withTrimmedLeft (swW + 8.0f);
+    g.setColour (isOn ? juce::Colour (0xfff2d79b) : juce::Colour (0xffcfc7b8));
+    g.setFont (juce::Font (10.5f, juce::Font::bold));
+    g.drawFittedText (button.getButtonText(), textRect.toNearestInt(), juce::Justification::centredLeft, 1);
+}
 
 MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
+    setLookAndFeel (&miniMoonLookAndFeel);
+
     const juce::StringArray rangeChoices { "LO", "32'", "16'", "8'", "4'", "2'" };
     const juce::StringArray waveChoices  { "Tri", "Tri/Saw", "Saw", "Square", "Wide Pulse", "Narrow Pulse" };
     const juce::StringArray noiseChoices { "White", "Pink" };
 
     // CONTROLLERS
-    setupKnob (tuneSlider, tuneLabel, "TUNE");
-    setupKnob (glideSlider, glideLabel, "GLIDE");
-    setupKnob (modMixSlider, modMixLabel, "MOD MIX");
+    setupKnob   (tuneSlider, tuneLabel, "TUNE");
+    setupKnob   (glideSlider, glideLabel, "GLIDE");
+    setupKnob   (pbRangeSlider, pbRangeLabel, "PB RNG");
+    setupKnob   (modMixSlider, modMixLabel, "MOD MIX");
     setupToggle (oscModBtn, "OSC MOD");
     setupToggle (osc3CtrlBtn, "OSC 3 CTRL");
+    setupToggle (legatoBtn, "LEGATO");
 
     // OSCILLATOR BANK
     setupCombo (osc1RangeBox, osc1RangeLabel, "OSC 1 RNG", rangeChoices);
@@ -59,9 +140,11 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     auto& tree = audioProcessor.apvts;
     tuneAtt       = std::make_unique<SliderAttachment> (tree, "tune", tuneSlider);
     glideAtt      = std::make_unique<SliderAttachment> (tree, "glide", glideSlider);
+    pbRangeAtt    = std::make_unique<SliderAttachment> (tree, "pitch_bend_range", pbRangeSlider);
     modMixAtt     = std::make_unique<SliderAttachment> (tree, "mod_mix", modMixSlider);
     oscModAtt     = std::make_unique<ButtonAttachment> (tree, "osc_mod_on", oscModBtn);
     osc3CtrlAtt   = std::make_unique<ButtonAttachment> (tree, "osc3_ctrl_on", osc3CtrlBtn);
+    legatoAtt     = std::make_unique<ButtonAttachment> (tree, "legato_on", legatoBtn);
 
     osc1RangeAtt  = std::make_unique<ComboAttachment>  (tree, "osc1_range", osc1RangeBox);
     osc1FreqAtt   = std::make_unique<SliderAttachment> (tree, "osc1_freq", osc1FreqSlider);
@@ -100,18 +183,18 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     masterVolAtt  = std::make_unique<SliderAttachment> (tree, "master_vol", masterVolSlider);
     mainOutAtt    = std::make_unique<ButtonAttachment> (tree, "main_out_on", mainOutBtn);
 
-    setSize (980, 440);
+    setSize (1020, 450);
 }
 
-MiniJJMoogAudioProcessorEditor::~MiniJJMoogAudioProcessorEditor() = default;
+MiniJJMoogAudioProcessorEditor::~MiniJJMoogAudioProcessorEditor()
+{
+    setLookAndFeel (nullptr);
+}
 
 void MiniJJMoogAudioProcessorEditor::setupKnob (juce::Slider& slider, juce::Label& label, const juce::String& text)
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 52, 14);
-    slider.setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xffd6b36a));
-    slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colour (0xff4a4742));
-    slider.setColour (juce::Slider::thumbColourId, juce::Colours::white);
     slider.setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xffe8e2d5));
     slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0xff232220));
     addAndMakeVisible (slider);
@@ -126,7 +209,7 @@ void MiniJJMoogAudioProcessorEditor::setupKnob (juce::Slider& slider, juce::Labe
 void MiniJJMoogAudioProcessorEditor::setupCombo (juce::ComboBox& box, juce::Label& label, const juce::String& text, const juce::StringArray& items)
 {
     box.addItemList (items, 1);
-    box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff262522));
+    box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff22211e));
     box.setColour (juce::ComboBox::textColourId, juce::Colour (0xffe8e2d5));
     box.setColour (juce::ComboBox::outlineColourId, juce::Colour (0xff7a7468));
     addAndMakeVisible (box);
@@ -141,26 +224,41 @@ void MiniJJMoogAudioProcessorEditor::setupCombo (juce::ComboBox& box, juce::Labe
 void MiniJJMoogAudioProcessorEditor::setupToggle (juce::ToggleButton& btn, const juce::String& text)
 {
     btn.setButtonText (text);
-    btn.setColour (juce::ToggleButton::textColourId, juce::Colour (0xffd6b36a));
-    btn.setColour (juce::ToggleButton::tickColourId, juce::Colour (0xffd6b36a));
     addAndMakeVisible (btn);
 }
 
 void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff5c361a));
+    g.fillAll (juce::Colour (0xff4a2912));
+    g.setColour (juce::Colour (0xff6e3f1d));
+    g.fillRect (0, 0, getWidth(), 6);
+    g.setColour (juce::Colour (0xff2c1708));
+    g.fillRect (0, getHeight() - 6, getWidth(), 6);
 
     auto panel = getLocalBounds().reduced (14, 14).toFloat();
-    g.setColour (juce::Colour (0xff151517));
-    g.fillRoundedRectangle (panel, 6.0f);
+    g.setColour (juce::Colour (0xff121214));
+    g.fillRoundedRectangle (panel, 5.0f);
 
     g.setColour (juce::Colour (0xff8c7d5b));
-    g.drawRoundedRectangle (panel, 6.0f, 1.5f);
+    g.drawRoundedRectangle (panel, 5.0f, 1.5f);
+
+    const float screwOffsetsX[2] = { panel.getX() + 8.0f, panel.getRight() - 8.0f };
+    const float screwOffsetsY[2] = { panel.getY() + 8.0f, panel.getBottom() - 8.0f };
+    for (float sx : screwOffsetsX)
+    {
+        for (float sy : screwOffsetsY)
+        {
+            g.setColour (juce::Colour (0xff58544c));
+            g.fillEllipse (sx - 3.5f, sy - 3.5f, 7.0f, 7.0f);
+            g.setColour (juce::Colour (0xff1a1917));
+            g.drawLine (sx - 2.0f, sy, sx + 2.0f, sy, 1.0f);
+        }
+    }
 
     auto header = panel.removeFromTop (28.0f);
     g.setColour (juce::Colour (0xffd6b36a));
-    g.setFont (juce::Font (16.0f, juce::Font::bold));
-    g.drawText ("MINI JJ MOOG  —  ANALOG SYNTHESIZER", header.reduced (12, 0), juce::Justification::centredLeft);
+    g.setFont (juce::Font (17.0f, juce::Font::bold));
+    g.drawText ("MINI MOON - ANALOG SYNTHESIZER", header.reduced (18, 0), juce::Justification::centredLeft);
 
     const float secW = panel.getWidth() / 5.0f;
     const juce::StringArray secTitles { "CONTROLLERS", "OSCILLATOR BANK", "MIXER", "MODIFIERS", "OUTPUT" };
@@ -209,12 +307,14 @@ void MiniJJMoogAudioProcessorEditor::resized()
         const int x0 = panel.getX();
         const int y0 = panel.getY() + topBar;
         const int kw = secW / 2;
-        const int kh = 92;
-        placeKnob (tuneSlider, tuneLabel, x0, y0, kw, kh);
-        placeKnob (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
-        placeKnob (modMixSlider, modMixLabel, x0, y0 + kh, kw, kh);
-        oscModBtn.setBounds (x0 + kw + 8, y0 + kh + 18, kw - 12, 24);
-        osc3CtrlBtn.setBounds (x0 + kw + 8, y0 + kh + 48, kw - 12, 24);
+        const int kh = 84;
+        placeKnob   (tuneSlider, tuneLabel, x0, y0, kw, kh);
+        placeKnob   (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
+        placeKnob   (pbRangeSlider, pbRangeLabel, x0, y0 + kh, kw, kh);
+        placeKnob   (modMixSlider, modMixLabel, x0 + kw, y0 + kh, kw, kh);
+        oscModBtn.setBounds   (x0 + 6, y0 + kh * 2 + 8, kw - 10, 22);
+        osc3CtrlBtn.setBounds (x0 + kw + 4, y0 + kh * 2 + 8, kw - 8, 22);
+        legatoBtn.setBounds   (x0 + 6, y0 + kh * 2 + 34, secW - 12, 22);
     }
 
     // 2. OSCILLATOR BANK
