@@ -139,12 +139,14 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     const juce::StringArray rangeChoices { "LO", "32'", "16'", "8'", "4'", "2'" };
     const juce::StringArray waveChoices  { "Tri", "Tri/Saw", "Saw", "Square", "Wide Pulse", "Narrow Pulse" };
     const juce::StringArray noiseChoices { "White", "Pink" };
+    const juce::StringArray polyChoices  { "Mono", "Poly 4", "Poly 8", "Poly 16" };
 
     // CONTROLLERS
     setupKnob   (tuneSlider, tuneLabel, "TUNE");
     setupKnob   (glideSlider, glideLabel, "GLIDE");
     setupKnob   (pbRangeSlider, pbRangeLabel, "PB RNG");
     setupKnob   (modMixSlider, modMixLabel, "MOD MIX");
+    setupCombo  (voiceModeBox, voiceModeLabel, "POLY MODE", polyChoices);
     setupToggle (oscModBtn, "OSC MOD", MiniMoonLookAndFeel::SwitchAccent::yellow);
     setupToggle (osc3CtrlBtn, "OSC 3 CTRL", MiniMoonLookAndFeel::SwitchAccent::blue);
     setupToggle (legatoBtn, "LEGATO", MiniMoonLookAndFeel::SwitchAccent::red);
@@ -195,6 +197,7 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     glideAtt      = std::make_unique<SliderAttachment> (tree, "glide", glideSlider);
     pbRangeAtt    = std::make_unique<SliderAttachment> (tree, "pitch_bend_range", pbRangeSlider);
     modMixAtt     = std::make_unique<SliderAttachment> (tree, "mod_mix", modMixSlider);
+    voiceModeAtt  = std::make_unique<ComboAttachment>  (tree, "voice_mode", voiceModeBox);
     oscModAtt     = std::make_unique<ButtonAttachment> (tree, "osc_mod_on", oscModBtn);
     osc3CtrlAtt   = std::make_unique<ButtonAttachment> (tree, "osc3_ctrl_on", osc3CtrlBtn);
     legatoAtt     = std::make_unique<ButtonAttachment> (tree, "legato_on", legatoBtn);
@@ -314,8 +317,6 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
         }
     }
 
-    // Larguras proporcionais por secao (total = 1.0f):
-    // Controllers: 17%, Osc Bank: 21%, Mixer: 20%, Modifiers: 27%, Output: 15%
     const float weights[5] = { 0.17f, 0.21f, 0.20f, 0.27f, 0.15f };
     float colXArr[5];
     float colWArr[5];
@@ -348,7 +349,6 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
                     juce::Justification::centred);
     }
 
-    // Quadrilatero de aluminio escovado com escrita em preto ("Mini Moon" em duas linhas, maior e mais fina)
     const float outX = colXArr[4];
     const float outW = colWArr[4];
     const float badgeW = std::max (96.0f, outW - 22.0f);
@@ -361,7 +361,6 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
     g.setGradientFill (brushedGrad);
     g.fillRect (badgeX, badgeY, badgeW, badgeH);
 
-    // Linhas sutis de aluminio escovado
     g.setColour (juce::Colour (0x30ffffff));
     for (float yLine = badgeY + 3.0f; yLine < badgeY + badgeH - 2.0f; yLine += 3.0f)
         g.drawLine (badgeX + 2.0f, yLine, badgeX + badgeW - 2.0f, yLine, 0.6f);
@@ -369,7 +368,6 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff141416));
     g.drawRect (badgeX, badgeY, badgeW, badgeH, 1.2f);
 
-    // Fonte maior e mais fina (plain), duas linhas: "Mini" acima de "Moon"
     g.setColour (juce::Colour (0xff0e0e10));
     g.setFont (juce::Font (17.5f, juce::Font::plain));
     const float halfBadgeH = badgeH * 0.5f;
@@ -417,26 +415,27 @@ void MiniJJMoogAudioProcessorEditor::resized()
         b.setBounds (x + 4, y + 15, std::max (30, w - 8), 22);
     };
 
-    // 1. CONTROLLERS (17% da largura)
+    // 1. CONTROLLERS
     {
         const int x0 = colX[0];
         const int w0 = colW[0];
-        const int y0 = panel.getY() + topBar + 4;
+        const int y0 = panel.getY() + topBar + 2;
         const int kw = w0 / 2;
-        const int kh = 76;
+        const int kh = 72;
 
-        placeKnob (tuneSlider, tuneLabel, x0, y0, kw, kh);
-        placeKnob (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
-        placeKnob (pbRangeSlider, pbRangeLabel, x0, y0 + kh, kw, kh);
-        placeKnob (modMixSlider, modMixLabel, x0 + kw, y0 + kh, kw, kh);
+        placeKnob  (tuneSlider, tuneLabel, x0, y0, kw, kh);
+        placeKnob  (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
+        placeKnob  (pbRangeSlider, pbRangeLabel, x0, y0 + kh, kw, kh);
+        placeKnob  (modMixSlider, modMixLabel, x0 + kw, y0 + kh, kw, kh);
+        placeCombo (voiceModeBox, voiceModeLabel, x0 + 2, y0 + kh * 2, w0 - 4, 38);
 
-        const int by = y0 + kh * 2 + 16;
-        oscModBtn.setBounds   (x0 + 6, by, w0 - 12, 22);
-        osc3CtrlBtn.setBounds (x0 + 6, by + 26, w0 - 12, 22);
-        legatoBtn.setBounds   (x0 + 6, by + 52, w0 - 12, 22);
+        const int by = y0 + kh * 2 + 40;
+        oscModBtn.setBounds   (x0 + 6, by, w0 - 12, 20);
+        osc3CtrlBtn.setBounds (x0 + 6, by + 22, w0 - 12, 20);
+        legatoBtn.setBounds   (x0 + 6, by + 44, w0 - 12, 20);
     }
 
-    // 2. OSCILLATOR BANK (21% da largura)
+    // 2. OSCILLATOR BANK
     {
         const int x0 = colX[1];
         const int w0 = colW[1];
@@ -459,7 +458,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
         placeCombo (osc3WaveBox, osc3WaveLabel, x0 + c1 + c2, y0 + rowH * 2, c3, rowH);
     }
 
-    // 3. MIXER (20% da largura)
+    // 3. MIXER
     {
         const int x0 = colX[2];
         const int w0 = colW[2];
@@ -476,7 +475,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
         placeKnob  (overloadSlider, overloadLabel, x0, y0 + kh * 3, kw, kh);
     }
 
-    // 4. MODIFIERS (27% da largura - espaco amplo para FLT MOD e KB CTRL)
+    // 4. MODIFIERS
     {
         const int x0 = colX[3];
         const int w0 = colW[3];
@@ -500,7 +499,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
         placeKnob (emphasisSlider, emphasisLabel, x0, y0 + kh * 3, kw, kh);
     }
 
-    // 5. OUTPUT (15% da largura - mais compacto para caber tudo sem embolar)
+    // 5. OUTPUT
     {
         const int x0 = colX[4];
         const int w0 = colW[4];
