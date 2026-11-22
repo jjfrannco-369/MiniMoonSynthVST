@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
+#include <map>
 
 class MiniMoonLookAndFeel : public juce::LookAndFeel_V4
 {
@@ -51,6 +52,8 @@ private:
     // CONTROLLERS
     juce::Slider tuneSlider, glideSlider, pbRangeSlider, modMixSlider;
     juce::Label tuneLabel, glideLabel, pbRangeLabel, modMixLabel;
+    juce::ComboBox voiceModeBox;
+    juce::Label voiceModeLabel;
     juce::ToggleButton oscModBtn, osc3CtrlBtn, legatoBtn;
 
     // OSCILLATOR BANK
@@ -81,6 +84,7 @@ private:
 
     // Attachments
     std::unique_ptr<SliderAttachment> tuneAtt, glideAtt, pbRangeAtt, modMixAtt;
+    std::unique_ptr<ComboAttachment> voiceModeAtt;
     std::unique_ptr<ButtonAttachment> oscModAtt, osc3CtrlAtt, legatoAtt;
 
     std::unique_ptr<ComboAttachment> osc1RangeAtt, osc1WaveAtt, osc2RangeAtt, osc2WaveAtt, osc3RangeAtt, osc3WaveAtt;
