@@ -56,7 +56,6 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     setupKnob   (masterVolSlider, masterVolLabel, "VOLUME");
     setupToggle (mainOutBtn, "MAIN OUT");
 
-    // Attachments
     auto& tree = audioProcessor.apvts;
     tuneAtt       = std::make_unique<SliderAttachment> (tree, "tune", tuneSlider);
     glideAtt      = std::make_unique<SliderAttachment> (tree, "glide", glideSlider);
@@ -149,7 +148,6 @@ void MiniJJMoogAudioProcessorEditor::setupToggle (juce::ToggleButton& btn, const
 
 void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // Gabinete estilo madeira clássica nas bordas
     g.fillAll (juce::Colour (0xff5c361a));
 
     auto panel = getLocalBounds().reduced (14, 14).toFloat();
@@ -159,33 +157,36 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff8c7d5b));
     g.drawRoundedRectangle (panel, 6.0f, 1.5f);
 
-    // Cabeçalho clássico
     auto header = panel.removeFromTop (28.0f);
     g.setColour (juce::Colour (0xffd6b36a));
     g.setFont (juce::Font (16.0f, juce::Font::bold));
     g.drawText ("MINI JJ MOOG  —  ANALOG SYNTHESIZER", header.reduced (12, 0), juce::Justification::centredLeft);
 
-    // Divisórias de seções
     const float secW = panel.getWidth() / 5.0f;
     const juce::StringArray secTitles { "CONTROLLERS", "OSCILLATOR BANK", "MIXER", "MODIFIERS", "OUTPUT" };
 
     for (int i = 0; i < 5; ++i)
     {
-        juce::Rectangle<float> col (panel.getX() + i * secW, panel.getY(), secW, panel.getHeight());
+        const float colX = panel.getX() + static_cast<float> (i) * secW;
         if (i > 0)
         {
             g.setColour (juce::Colour (0xff3c3a36));
-            g.drawLine (col.getX(), col.getY() + 4.0f, col.getX(), col.getBottom() - 4.0f, 1.0f);
+            g.drawLine (colX, panel.getY() + 4.0f, colX, panel.getBottom() - 4.0f, 1.0f);
         }
         g.setColour (juce::Colour (0xffb8a472));
         g.setFont (juce::Font (11.0f, juce::Font::bold));
-        g.drawText (secTitles[i], col.getX() + 4.0f, col.getY() + 2.0f, secW - 8.0f, 16.0f, juce::Justification::centred);
+        g.drawText (secTitles[i],
+                    juce::roundToInt (colX + 4.0f),
+                    juce::roundToInt (panel.getY() + 2.0f),
+                    juce::roundToInt (secW - 8.0f),
+                    16,
+                    juce::Justification::centred);
     }
 }
 
 void MiniJJMoogAudioProcessorEditor::resized()
 {
-    auto panel = getLocalBounds().reduced (14, 14);
+    const auto panel = getLocalBounds().reduced (14, 14);
     const int topBar = 22;
     const int secW = panel.getWidth() / 5;
     const int secH = panel.getHeight() - topBar;
@@ -193,21 +194,22 @@ void MiniJJMoogAudioProcessorEditor::resized()
     auto placeKnob = [] (juce::Slider& s, juce::Label& l, int x, int y, int w, int h)
     {
         l.setBounds (x, y, w, 14);
-        s.setBounds (x, y + 14, w, h - 14);
+        s.setBounds (x, y + 14, w, std::max (20, h - 14));
     };
 
     auto placeCombo = [] (juce::ComboBox& b, juce::Label& l, int x, int y, int w, int h)
     {
+        juce::ignoreUnused (h);
         l.setBounds (x, y, w, 14);
-        b.setBounds (x + 4, y + 14, w - 8, 22);
+        b.setBounds (x + 4, y + 14, std::max (24, w - 8), 22);
     };
 
     // 1. CONTROLLERS
     {
-        int x0 = panel.getX();
-        int y0 = panel.getY() + topBar;
-        int kw = secW / 2;
-        int kh = 92;
+        const int x0 = panel.getX();
+        const int y0 = panel.getY() + topBar;
+        const int kw = secW / 2;
+        const int kh = 92;
         placeKnob (tuneSlider, tuneLabel, x0, y0, kw, kh);
         placeKnob (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
         placeKnob (modMixSlider, modMixLabel, x0, y0 + kh, kw, kh);
@@ -215,14 +217,14 @@ void MiniJJMoogAudioProcessorEditor::resized()
         osc3CtrlBtn.setBounds (x0 + kw + 8, y0 + kh + 48, kw - 12, 24);
     }
 
-    // 2. OSCILLATOR BANK (3 linhas: Osc 1, Osc 2, Osc 3)
+    // 2. OSCILLATOR BANK
     {
-        int x0 = panel.getX() + secW;
-        int y0 = panel.getY() + topBar;
-        int rowH = secH / 3;
-        int c1 = static_cast<int> (secW * 0.30f);
-        int c2 = static_cast<int> (secW * 0.32f);
-        int c3 = secW - c1 - c2;
+        const int x0 = panel.getX() + secW;
+        const int y0 = panel.getY() + topBar;
+        const int rowH = secH / 3;
+        const int c1 = static_cast<int> (static_cast<float> (secW) * 0.30f);
+        const int c2 = static_cast<int> (static_cast<float> (secW) * 0.32f);
+        const int c3 = secW - c1 - c2;
 
         placeCombo (osc1RangeBox, osc1RangeLabel, x0, y0, c1, rowH);
         placeKnob  (osc1FreqSlider, osc1FreqLabel, x0 + c1, y0, c2, rowH);
@@ -239,10 +241,10 @@ void MiniJJMoogAudioProcessorEditor::resized()
 
     // 3. MIXER
     {
-        int x0 = panel.getX() + secW * 2;
-        int y0 = panel.getY() + topBar;
-        int kw = secW / 2;
-        int kh = 88;
+        const int x0 = panel.getX() + secW * 2;
+        const int y0 = panel.getY() + topBar;
+        const int kw = secW / 2;
+        const int kh = 88;
         placeKnob  (osc1VolSlider, osc1VolLabel, x0, y0, kw, kh);
         placeKnob  (osc2VolSlider, osc2VolLabel, x0 + kw, y0, kw, kh);
         placeKnob  (osc3VolSlider, osc3VolLabel, x0, y0 + kh, kw, kh);
@@ -254,10 +256,10 @@ void MiniJJMoogAudioProcessorEditor::resized()
 
     // 4. MODIFIERS
     {
-        int x0 = panel.getX() + secW * 3;
-        int y0 = panel.getY() + topBar;
-        int kw = secW / 3;
-        int kh = 88;
+        const int x0 = panel.getX() + secW * 3;
+        const int y0 = panel.getY() + topBar;
+        const int kw = secW / 3;
+        const int kh = 88;
 
         filterModBtn.setBounds (x0 + 6, y0 + 10, kw - 8, 24);
         kbCtrlBtn.setBounds (x0 + 6, y0 + 38, kw - 8, 24);
@@ -277,8 +279,8 @@ void MiniJJMoogAudioProcessorEditor::resized()
 
     // 5. OUTPUT
     {
-        int x0 = panel.getX() + secW * 4;
-        int y0 = panel.getY() + topBar;
+        const int x0 = panel.getX() + secW * 4;
+        const int y0 = panel.getY() + topBar;
         placeKnob   (masterVolSlider, masterVolLabel, x0 + 16, y0 + 12, secW - 32, 110);
         mainOutBtn.setBounds (x0 + 24, y0 + 135, secW - 48, 28);
     }
