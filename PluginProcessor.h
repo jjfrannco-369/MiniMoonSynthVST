@@ -52,7 +52,12 @@ private:
 
     std::array<double, 3> oscPhases { 0.0, 0.0, 0.0 };
     double lfoPhase = 0.0;
-    double noteFreqHz = 110.0;
+
+    double targetFreqHz = 261.625565; // C4 (MIDI 60) com A4 = 440 Hz
+    double currentFreqHz = 261.625565;
+    float pitchBendSemitones = 0.0f; // +/- 2 semitons por padrao
+    float modWheelAmount = 0.0f;     // CC 1 (0.0 a 1.0)
+
     float noteVelocity = 0.0f;
     int currentMidiNote = -1;
     bool gateHeld = false;
