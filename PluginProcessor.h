@@ -53,10 +53,10 @@ private:
     std::array<double, 3> oscPhases { 0.0, 0.0, 0.0 };
     double lfoPhase = 0.0;
 
-    // Glide exponencial em semitons MIDI (A4 = 69 -> 440 Hz)
     double targetMidiPitch = 60.0;
     double currentMidiPitch = 60.0;
-    float pitchBendNorm = 0.0f; // -1.0 a +1.0
+    float pitchBendNorm = 0.0f;
+    float smoothedBendNorm = 0.0f;
     float modWheelAmount = 0.0f;
 
     float noteVelocity = 0.0f;
