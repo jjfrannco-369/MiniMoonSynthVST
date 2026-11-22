@@ -39,29 +39,17 @@ const juce::String MiniJJMoogAudioProcessor::getName() const
 
 bool MiniJJMoogAudioProcessor::acceptsMidi() const
 {
-   #if JucePlugin_WantsMidiInput
     return true;
-   #else
-    return true;
-   #endif
 }
 
 bool MiniJJMoogAudioProcessor::producesMidi() const
 {
-   #if JucePlugin_ProducesMidiOutput
-    return true;
-   #else
     return false;
-   #endif
 }
 
 bool MiniJJMoogAudioProcessor::isMidiEffect() const
 {
-   #if JucePlugin_IsMidiEffect
-    return true;
-   #else
     return false;
-   #endif
 }
 
 double MiniJJMoogAudioProcessor::getTailLengthSeconds() const
@@ -172,7 +160,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         if (currentVelocity > 0.0001f)
         {
-            // Onda dente de serra simples como base analógica inicial
             const float saw = static_cast<float> (1.0 - (phase / juce::MathConstants<double>::pi));
             outSample = saw * currentVelocity * gainVal * 0.25f;
 
