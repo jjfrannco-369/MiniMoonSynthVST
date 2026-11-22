@@ -47,6 +47,7 @@ private:
     struct SynthVoice
     {
         bool active = false;
+        bool noteKeyHeld = false;
         int midiNote = 60;
         float velocity = 0.0f;
         double targetPitch = 60.0;
@@ -79,6 +80,7 @@ private:
     float pitchBendNorm = 0.0f;
     float smoothedBendNorm = 0.0f;
     float modWheelAmount = 0.0f;
+    bool sustainPedalDown = false;
 
     std::vector<int> heldNotes;
     float noteVelocity = 0.0f;
