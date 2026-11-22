@@ -24,6 +24,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     const juce::StringArray rangeChoices { "LO", "32'", "16'", "8'", "4'", "2'" };
     const juce::StringArray waveChoices  { "Tri", "Tri/Saw", "Saw", "Square", "Wide Pulse", "Narrow Pulse" };
     const juce::StringArray noiseChoices { "White", "Pink" };
+    const juce::StringArray polyChoices  { "Mono", "Poly 4", "Poly 8", "Poly 16" };
 
     // CONTROLLERS
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -34,6 +35,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
         "pitch_bend_range", "PB Range", juce::NormalisableRange<float> (1.0f, 24.0f, 1.0f), 12.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "mod_mix", "Mod Mix", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.35f));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        "voice_mode", "Poly Mode", polyChoices, 0));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "osc_mod_on", "Osc Mod", true));
     layout.add (std::make_unique<juce::AudioParameterBool> (
@@ -41,7 +44,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "legato_on", "Legato", true));
 
-    // OSCILLATOR BANK (8' = 1.0x para A4 = 440 Hz)
+    // OSCILLATOR BANK
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         "osc1_range", "Osc 1 Range", rangeChoices, 3));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -114,6 +117,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     return layout;
 }
 
+int MiniJJMoogAudioProcessor::voiceModeToCount (int modeIndex)
+{
+    switch (modeIndex)
+    {
+        case 1: return 4;
+        case 2: return 8;
+        case 3: return 16;
+        case 0:
+        default: return 1;
+    }
+}
+
 float MiniJJMoogAudioProcessor::rangeToOctaveMultiplier (int rangeIndex)
 {
     switch (rangeIndex)
@@ -161,31 +176,73 @@ float MiniJJMoogAudioProcessor::secondsToCoeff (float seconds, double sampleRate
     return static_cast<float> (1.0 - std::exp (-1.0 / (clamped * sampleRate)));
 }
 
-void MiniJJMoogAudioProcessor::updateTargetFromHeldNotes()
+void MiniJJMoogAudioProcessor::triggerPolyNoteOn (int noteNumber, float vel, int activeVoiceCount, bool legatoMode)
 {
-    if (heldNotes.empty())
-        return;
+    int chosenIdx = -1;
 
-    // Se ha mais de uma nota pressionada: a nota mais alta (max) vence;
-    // quando a mais alta e solta, retorna para a nota mais grave (min) entre as restantes.
-    if (heldNotes.size() > 1)
+    // Reutiliza voz ja tocando a mesma nota se houver
+    for (int i = 0; i < activeVoiceCount; ++i)
     {
-        const auto highestIt = std::max_element (heldNotes.begin(), heldNotes.end());
-        if (highestIt != heldNotes.end() && *highestIt != currentMidiNote)
-            currentMidiNote = *highestIt;
-        else
+        if (voices[i].active && voices[i].midiNote == noteNumber)
         {
-            const auto lowestIt = std::min_element (heldNotes.begin(), heldNotes.end());
-            if (lowestIt != heldNotes.end())
-                currentMidiNote = *lowestIt;
+            chosenIdx = i;
+            break;
         }
     }
-    else
+
+    // Senao, pega voz inativa
+    if (chosenIdx < 0)
     {
-        currentMidiNote = heldNotes.front();
+        for (int i = 0; i < activeVoiceCount; ++i)
+        {
+            if (! voices[i].active && voices[i].envLevel < 0.002f)
+            {
+                chosenIdx = i;
+                break;
+            }
+        }
     }
 
-    targetMidiPitch = static_cast<double> (currentMidiNote);
+    // Senao, pega a voz mais antiga (voice stealing)
+    if (chosenIdx < 0)
+    {
+        uint64_t oldestAge = UINT64_MAX;
+        for (int i = 0; i < activeVoiceCount; ++i)
+        {
+            if (voices[i].ageCounter < oldestAge)
+            {
+                oldestAge = voices[i].ageCounter;
+                chosenIdx = i;
+            }
+        }
+    }
+
+    if (chosenIdx < 0)
+        chosenIdx = 0;
+
+    auto& v = voices[chosenIdx];
+    const bool wasActive = v.active && v.envLevel > 0.02f;
+    v.midiNote = noteNumber;
+    v.velocity = std::max (0.15f, vel);
+    v.targetPitch = static_cast<double> (noteNumber);
+    if (! wasActive)
+        v.currentPitch = v.targetPitch;
+
+    v.active = true;
+    v.ageCounter = ++voiceAgeTick;
+    if (! (legatoMode && wasActive))
+        v.envLevel = std::max (v.envLevel, 0.30f);
+
+    currentMidiNote = noteNumber;
+}
+
+void MiniJJMoogAudioProcessor::triggerPolyNoteOff (int noteNumber)
+{
+    for (auto& v : voices)
+    {
+        if (v.active && v.midiNote == noteNumber)
+            v.active = false;
+    }
 }
 
 const juce::String MiniJJMoogAudioProcessor::getName() const { return "Mini Moon"; }
@@ -213,6 +270,19 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     moogFilter.reset();
 
     oscPhases.fill (0.0);
+    for (auto& v : voices)
+    {
+        v.active = false;
+        v.midiNote = 60;
+        v.velocity = 0.0f;
+        v.targetPitch = 60.0;
+        v.currentPitch = 60.0;
+        v.envLevel = 0.0f;
+        v.ageCounter = 0;
+        v.phases.fill (0.0);
+    }
+
+    voiceAgeTick = 0;
     lfoPhase = 0.0;
     targetMidiPitch = 60.0;
     currentMidiPitch = 60.0;
@@ -259,6 +329,9 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     if (numChannels <= 0 || numSamples <= 0)
         return;
 
+    const int voiceModeIdx = static_cast<int> (apvts.getRawParameterValue ("voice_mode")->load());
+    const int activeVoiceCount = voiceModeToCount (voiceModeIdx);
+    const bool isPoly = activeVoiceCount > 1;
     const bool legatoMode = apvts.getRawParameterValue ("legato_on")->load() > 0.5f;
 
     for (const auto metadata : midiMessages)
@@ -266,54 +339,67 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         const auto msg = metadata.getMessage();
         if (msg.isNoteOn())
         {
-            const bool hadHeldNotes = ! heldNotes.empty();
             const int noteNum = msg.getNoteNumber();
+            const float vel = std::max (0.15f, msg.getFloatVelocity());
 
-            heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), noteNum), heldNotes.end());
-            heldNotes.push_back (noteNum);
-
-            noteVelocity = std::max (0.15f, msg.getFloatVelocity());
-
-            if (heldNotes.size() == 1)
+            if (isPoly)
             {
-                currentMidiNote = noteNum;
-                targetMidiPitch = static_cast<double> (currentMidiNote);
-                if (! hadHeldNotes && ! gateHeld)
-                    currentMidiPitch = targetMidiPitch;
+                triggerPolyNoteOn (noteNum, vel, activeVoiceCount, legatoMode);
             }
             else
             {
-                // Nota mais alta tocada apos a primeira assume o alvo com glide
-                const int highestNote = *std::max_element (heldNotes.begin(), heldNotes.end());
-                currentMidiNote = highestNote;
-                targetMidiPitch = static_cast<double> (currentMidiNote);
-            }
+                const bool hadHeldNotes = ! heldNotes.empty();
+                heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), noteNum), heldNotes.end());
+                heldNotes.push_back (noteNum);
 
-            gateHeld = true;
+                noteVelocity = vel;
 
-            const bool isLegatoSlide = legatoMode && hadHeldNotes;
-            if (! isLegatoSlide)
-            {
-                filterEnvValue = std::max (filterEnvValue, 0.25f);
-                loudnessEnvValue = std::max (loudnessEnvValue, 0.25f);
+                if (heldNotes.size() == 1)
+                {
+                    currentMidiNote = noteNum;
+                    targetMidiPitch = static_cast<double> (currentMidiNote);
+                    if (! hadHeldNotes && ! gateHeld)
+                        currentMidiPitch = targetMidiPitch;
+                }
+                else
+                {
+                    const int highestNote = *std::max_element (heldNotes.begin(), heldNotes.end());
+                    currentMidiNote = highestNote;
+                    targetMidiPitch = static_cast<double> (currentMidiNote);
+                }
+
+                gateHeld = true;
+
+                const bool isLegatoSlide = legatoMode && hadHeldNotes;
+                if (! isLegatoSlide)
+                {
+                    filterEnvValue = std::max (filterEnvValue, 0.25f);
+                    loudnessEnvValue = std::max (loudnessEnvValue, 0.25f);
+                }
             }
         }
         else if (msg.isNoteOff())
         {
             const int noteNum = msg.getNoteNumber();
-            heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), noteNum), heldNotes.end());
-
-            if (! heldNotes.empty())
+            if (isPoly)
             {
-                // Ao soltar a nota mais alta, volta automaticamente para a nota mais grave segurada
-                const int lowestNote = *std::min_element (heldNotes.begin(), heldNotes.end());
-                currentMidiNote = lowestNote;
-                targetMidiPitch = static_cast<double> (currentMidiNote);
-                gateHeld = true;
+                triggerPolyNoteOff (noteNum);
             }
             else
             {
-                gateHeld = false;
+                heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), noteNum), heldNotes.end());
+
+                if (! heldNotes.empty())
+                {
+                    const int lowestNote = *std::min_element (heldNotes.begin(), heldNotes.end());
+                    currentMidiNote = lowestNote;
+                    targetMidiPitch = static_cast<double> (currentMidiNote);
+                    gateHeld = true;
+                }
+                else
+                {
+                    gateHeld = false;
+                }
             }
         }
         else if (msg.isPitchWheel())
@@ -328,6 +414,8 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         else if (msg.isAllNotesOff() || msg.isAllSoundOff())
         {
             heldNotes.clear();
+            for (auto& v : voices)
+                v.active = false;
             gateHeld = false;
             noteVelocity = 0.0f;
         }
@@ -382,71 +470,29 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float lAtkCoeff     = secondsToCoeff (lAtk, currentSampleRate);
     const float lDecCoeff     = secondsToCoeff (lDec, currentSampleRate);
 
-    // Glide exponencial simetrico em semitons (subida e descida com a mesma curva)
     const double glideTau = std::max (0.001, static_cast<double> (glideSec) / 3.0);
     const double expGlideStep = (glideSec <= 0.002f)
         ? 1.0
         : (1.0 - std::exp (-1.0 / (glideTau * currentSampleRate)));
 
-    // Suavizacao de ~2 ms para pitch bend rapido (ex.: Save a Prayer) sem degraus
-    const float bendSmoothCoeff = secondsToCoeff (0.002f, currentSampleRate);
+    // Suavizacao gradativa (~18 ms) para evitar degraus mesmo em movimentos bruscos do Pitch Bend
+    const float bendSmoothCoeff = secondsToCoeff (0.018f, currentSampleRate);
 
     moogFilter.setResonance (0.707f + emphasis * 6.5f);
     const float driveGain = 1.0f + overloadAmt * 4.5f;
+    const float polyScale = isPoly ? (1.0f / std::sqrt (static_cast<float> (activeVoiceCount))) : 1.0f;
 
     const double lfoHz = 4.5;
     const float effectiveModDepth = juce::jlimit (0.0f, 1.5f, modMix + modWheelAmount * 0.65f);
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        currentMidiPitch += expGlideStep * (targetMidiPitch - currentMidiPitch);
-        const double glidedFreqHz = 440.0 * std::pow (2.0, (currentMidiPitch - 69.0) / 12.0);
-
         smoothedBendNorm += bendSmoothCoeff * (pitchBendNorm - smoothedBendNorm);
         const float bendSemis = smoothedBendNorm * pbRangeSemis;
 
         const float lfoWave = static_cast<float> (std::sin (2.0 * juce::MathConstants<double>::pi * lfoPhase));
         lfoPhase += lfoHz / currentSampleRate;
         if (lfoPhase >= 1.0) lfoPhase -= 1.0;
-
-        if (gateHeld)
-        {
-            filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
-            loudnessEnvValue += lAtkCoeff * (1.0f - loudnessEnvValue);
-        }
-        else
-        {
-            filterEnvValue += fDecCoeff * (0.0f - filterEnvValue);
-            loudnessEnvValue += lDecCoeff * (0.0f - loudnessEnvValue);
-        }
-
-        const float envModLevel = gateHeld
-            ? (filterEnvValue * (1.0f - fDecCoeff * 0.35f) + fSus * (fDecCoeff * 0.35f))
-            : filterEnvValue;
-
-        const float ampLevel = gateHeld
-            ? (loudnessEnvValue * (1.0f - lDecCoeff * 0.25f) + lSus * (lDecCoeff * 0.25f))
-            : loudnessEnvValue;
-
-        const double freq3 = glidedFreqHz * rangeToOctaveMultiplier (r3) * semitonesToRatio (f3 + tuneSemis + bendSemis);
-        const float out3 = renderWaveform (oscPhases[2], w3, 0.22f);
-        oscPhases[2] += freq3 / currentSampleRate;
-        if (oscPhases[2] >= 1.0) oscPhases[2] -= 1.0;
-
-        const float modPitchSemis = oscModOn ? (lfoWave * effectiveModDepth * 2.5f) : 0.0f;
-        const float totalSemisOffset = tuneSemis + bendSemis + modPitchSemis;
-
-        const double freq1 = glidedFreqHz * rangeToOctaveMultiplier (r1) * semitonesToRatio (f1 + totalSemisOffset);
-        const double freq2 = glidedFreqHz * rangeToOctaveMultiplier (r2) * semitonesToRatio (f2 + totalSemisOffset);
-
-        const float out1 = renderWaveform (oscPhases[0], w1, 0.22f);
-        const float out2 = renderWaveform (oscPhases[1], w2, 0.22f);
-
-        oscPhases[0] += freq1 / currentSampleRate;
-        if (oscPhases[0] >= 1.0) oscPhases[0] -= 1.0;
-
-        oscPhases[1] += freq2 / currentSampleRate;
-        if (oscPhases[1] >= 1.0) oscPhases[1] -= 1.0;
 
         const float white = rng.nextFloat() * 2.0f - 1.0f;
         pinkB0 = 0.99886f * pinkB0 + white * 0.0555179f;
@@ -459,23 +505,118 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         pinkB6 = white * 0.115926f;
         const float noiseSample = (noiseType == 1) ? pink : white;
 
-        const float osc3Mix = osc3CtrlOn ? 0.0f : (out3 * v3);
-        float mixed = (out1 * v1 + out2 * v2 + osc3Mix + noiseSample * noiseVol + extVol * 0.0f) * 0.45f;
-        mixed = std::tanh (mixed * driveGain);
+        float rawSynthSample = 0.0f;
+        float activeEnvForFilter = 0.0f;
+
+        if (! isPoly)
+        {
+            currentMidiPitch += expGlideStep * (targetMidiPitch - currentMidiPitch);
+            const double glidedFreqHz = 440.0 * std::pow (2.0, (currentMidiPitch - 69.0) / 12.0);
+
+            if (gateHeld)
+            {
+                filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
+                loudnessEnvValue += lAtkCoeff * (1.0f - loudnessEnvValue);
+            }
+            else
+            {
+                filterEnvValue += fDecCoeff * (0.0f - filterEnvValue);
+                loudnessEnvValue += lDecCoeff * (0.0f - loudnessEnvValue);
+            }
+
+            activeEnvForFilter = gateHeld
+                ? (filterEnvValue * (1.0f - fDecCoeff * 0.35f) + fSus * (fDecCoeff * 0.35f))
+                : filterEnvValue;
+
+            const float ampLevel = gateHeld
+                ? (loudnessEnvValue * (1.0f - lDecCoeff * 0.25f) + lSus * (lDecCoeff * 0.25f))
+                : loudnessEnvValue;
+
+            const double freq3 = glidedFreqHz * rangeToOctaveMultiplier (r3) * semitonesToRatio (f3 + tuneSemis + bendSemis);
+            const float out3 = renderWaveform (oscPhases[2], w3, 0.22f);
+            oscPhases[2] += freq3 / currentSampleRate;
+            if (oscPhases[2] >= 1.0) oscPhases[2] -= 1.0;
+
+            const float modPitchSemis = oscModOn ? (lfoWave * effectiveModDepth * 2.5f) : 0.0f;
+            const float totalSemisOffset = tuneSemis + bendSemis + modPitchSemis;
+
+            const double freq1 = glidedFreqHz * rangeToOctaveMultiplier (r1) * semitonesToRatio (f1 + totalSemisOffset);
+            const double freq2 = glidedFreqHz * rangeToOctaveMultiplier (r2) * semitonesToRatio (f2 + totalSemisOffset);
+
+            const float out1 = renderWaveform (oscPhases[0], w1, 0.22f);
+            const float out2 = renderWaveform (oscPhases[1], w2, 0.22f);
+
+            oscPhases[0] += freq1 / currentSampleRate;
+            if (oscPhases[0] >= 1.0) oscPhases[0] -= 1.0;
+
+            oscPhases[1] += freq2 / currentSampleRate;
+            if (oscPhases[1] >= 1.0) oscPhases[1] -= 1.0;
+
+            const float osc3Mix = osc3CtrlOn ? 0.0f : (out3 * v3);
+            rawSynthSample = (out1 * v1 + out2 * v2 + osc3Mix + noiseSample * noiseVol + extVol * 0.0f) * 0.45f * ampLevel * noteVelocity;
+        }
+        else
+        {
+            for (int i = 0; i < activeVoiceCount; ++i)
+            {
+                auto& v = voices[i];
+                if (! v.active && v.envLevel < 0.0005f)
+                    continue;
+
+                v.currentPitch += expGlideStep * (v.targetPitch - v.currentPitch);
+                const double voiceFreqHz = 440.0 * std::pow (2.0, (v.currentPitch - 69.0) / 12.0);
+
+                if (v.active)
+                    v.envLevel += lAtkCoeff * (1.0f - v.envLevel);
+                else
+                    v.envLevel += lDecCoeff * (0.0f - v.envLevel);
+
+                const float voiceAmp = v.active
+                    ? (v.envLevel * (1.0f - lDecCoeff * 0.20f) + lSus * (lDecCoeff * 0.20f))
+                    : v.envLevel;
+
+                activeEnvForFilter = std::max (activeEnvForFilter, voiceAmp);
+
+                const float modPitchSemis = oscModOn ? (lfoWave * effectiveModDepth * 2.5f) : 0.0f;
+                const float totalSemisOffset = tuneSemis + bendSemis + modPitchSemis;
+
+                const double fOsc1 = voiceFreqHz * rangeToOctaveMultiplier (r1) * semitonesToRatio (f1 + totalSemisOffset);
+                const double fOsc2 = voiceFreqHz * rangeToOctaveMultiplier (r2) * semitonesToRatio (f2 + totalSemisOffset);
+                const double fOsc3 = voiceFreqHz * rangeToOctaveMultiplier (r3) * semitonesToRatio (f3 + totalSemisOffset);
+
+                const float wOsc1 = renderWaveform (v.phases[0], w1, 0.22f);
+                const float wOsc2 = renderWaveform (v.phases[1], w2, 0.22f);
+                const float wOsc3 = renderWaveform (v.phases[2], w3, 0.22f);
+
+                v.phases[0] += fOsc1 / currentSampleRate;
+                if (v.phases[0] >= 1.0) v.phases[0] -= 1.0;
+
+                v.phases[1] += fOsc2 / currentSampleRate;
+                if (v.phases[1] >= 1.0) v.phases[1] -= 1.0;
+
+                v.phases[2] += fOsc3 / currentSampleRate;
+                if (v.phases[2] >= 1.0) v.phases[2] -= 1.0;
+
+                const float osc3Mix = osc3CtrlOn ? 0.0f : (wOsc3 * v3);
+                const float voiceMix = (wOsc1 * v1 + wOsc2 * v2 + osc3Mix + noiseSample * noiseVol * 0.25f) * 0.45f;
+                rawSynthSample += voiceMix * voiceAmp * v.velocity * polyScale;
+            }
+        }
+
+        const float saturated = std::tanh (rawSynthSample * driveGain);
 
         const float kbOffset = kbCtrlOn ? ((static_cast<float> (currentMidiNote) - 60.0f) * 24.0f) : 0.0f;
-        const float contourHz = envModLevel * filterContour * 5500.0f;
+        const float contourHz = activeEnvForFilter * filterContour * 5500.0f;
         const float lfoCutoffHz = filterModOn ? (lfoWave * effectiveModDepth * 2600.0f) : 0.0f;
         const float finalCutoff = juce::jlimit (35.0f, 16000.0f, baseCutoff + kbOffset + contourHz + lfoCutoffHz);
 
         moogFilter.setCutoffFrequency (finalCutoff);
 
-        const float shaped = mixed * ampLevel * noteVelocity;
         const float outputGain = mainOutOn ? masterVol : 0.0f;
 
         for (int ch = 0; ch < numChannels; ++ch)
         {
-            const float filtered = moogFilter.processSample (static_cast<size_t> (ch), shaped);
+            const float filtered = moogFilter.processSample (static_cast<size_t> (ch), saturated);
             buffer.setSample (ch, sample, filtered * outputGain);
         }
     }
