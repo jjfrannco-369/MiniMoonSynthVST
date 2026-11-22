@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include <array>
+#include <vector>
 
 class MiniJJMoogAudioProcessor : public juce::AudioProcessor
 {
@@ -48,20 +49,23 @@ private:
     static float renderWaveform (double normPhase, int waveIndex, float pulseWidth);
     static float secondsToCoeff (float seconds, double sampleRate);
 
+    void updateTargetFromHeldNotes();
+
     double currentSampleRate = 44100.0;
 
     std::array<double, 3> oscPhases { 0.0, 0.0, 0.0 };
     double lfoPhase = 0.0;
 
+    // Glide exponencial simetrico em semitons MIDI (A4 = 69 -> 440 Hz)
     double targetMidiPitch = 60.0;
     double currentMidiPitch = 60.0;
     float pitchBendNorm = 0.0f;
     float smoothedBendNorm = 0.0f;
     float modWheelAmount = 0.0f;
 
+    std::vector<int> heldNotes;
     float noteVelocity = 0.0f;
-    int currentMidiNote = -1;
-    int activeHeldNotes = 0;
+    int currentMidiNote = 60;
     bool gateHeld = false;
 
     float filterEnvValue = 0.0f;
