@@ -28,41 +28,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "tune", "Tune", juce::NormalisableRange<float> (-12.0f, 12.0f, 0.05f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "glide", "Glide", juce::NormalisableRange<float> (0.0f, 2.0f, 0.005f), 0.04f));
+        "glide", "Glide", juce::NormalisableRange<float> (0.0f, 2.0f, 0.005f), 0.08f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "mod_mix", "Mod Mix", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.25f));
+        "mod_mix", "Mod Mix", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.35f));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        "osc_mod_on", "Osc Mod", false));
+        "osc_mod_on", "Osc Mod", true));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "osc3_ctrl_on", "Osc 3 Ctrl", false));
 
-    // OSCILLATOR BANK (1, 2, 3)
+    // OSCILLATOR BANK (padrao em 8' = 1.0x para manter A4 = 440 Hz exato)
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc1_range", "Osc 1 Range", rangeChoices, 2));
+        "osc1_range", "Osc 1 Range", rangeChoices, 3)); // 8'
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc1_freq", "Osc 1 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc1_wave", "Osc 1 Wave", waveChoices, 2));
+        "osc1_wave", "Osc 1 Wave", waveChoices, 2)); // Saw
 
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc2_range", "Osc 2 Range", rangeChoices, 2));
+        "osc2_range", "Osc 2 Range", rangeChoices, 3)); // 8'
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "osc2_freq", "Osc 2 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), -0.08f));
+        "osc2_freq", "Osc 2 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc2_wave", "Osc 2 Wave", waveChoices, 2));
+        "osc2_wave", "Osc 2 Wave", waveChoices, 2)); // Saw
 
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc3_range", "Osc 3 Range", rangeChoices, 1));
+        "osc3_range", "Osc 3 Range", rangeChoices, 3)); // 8'
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc3_freq", "Osc 3 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc3_wave", "Osc 3 Wave", waveChoices, 3));
+        "osc3_wave", "Osc 3 Wave", waveChoices, 3)); // Square
 
     // MIXER
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc1_vol", "Osc 1 Vol", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.80f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "osc2_vol", "Osc 2 Vol", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.65f));
+        "osc2_vol", "Osc 2 Vol", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc3_vol", "Osc 3 Vol", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -80,25 +80,25 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "kb_ctrl_on", "Keyboard Control", true));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "cutoff", "Cutoff", juce::NormalisableRange<float> (30.0f, 14000.0f, 1.0f, 0.32f), 2200.0f));
+        "cutoff", "Cutoff", juce::NormalisableRange<float> (30.0f, 14000.0f, 1.0f, 0.32f), 3200.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "emphasis", "Emphasis", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.25f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "filter_contour", "Filter Contour", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.45f));
+        "filter_contour", "Filter Contour", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.35f));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "filter_attack", "Filter Attack", juce::NormalisableRange<float> (0.001f, 2.0f, 0.001f, 0.4f), 0.01f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "filter_decay", "Filter Decay", juce::NormalisableRange<float> (0.005f, 4.0f, 0.001f, 0.4f), 0.35f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "filter_sustain", "Filter Sustain", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.30f));
+        "filter_sustain", "Filter Sustain", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.40f));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "loud_attack", "Loud Attack", juce::NormalisableRange<float> (0.001f, 2.0f, 0.001f, 0.4f), 0.008f));
+        "loud_attack", "Loud Attack", juce::NormalisableRange<float> (0.001f, 2.0f, 0.001f, 0.4f), 0.005f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "loud_decay", "Loud Decay", juce::NormalisableRange<float> (0.005f, 4.0f, 0.001f, 0.4f), 0.40f));
+        "loud_decay", "Loud Decay", juce::NormalisableRange<float> (0.005f, 4.0f, 0.001f, 0.4f), 0.35f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        "loud_sustain", "Loud Sustain", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.75f));
+        "loud_sustain", "Loud Sustain", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.80f));
 
     // OUTPUT
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -113,13 +113,13 @@ float MiniJJMoogAudioProcessor::rangeToOctaveMultiplier (int rangeIndex)
 {
     switch (rangeIndex)
     {
-        case 0: return 0.125f;
-        case 1: return 0.25f;
-        case 2: return 0.5f;
-        case 3: return 1.0f;
-        case 4: return 2.0f;
-        case 5: return 4.0f;
-        default: return 0.5f;
+        case 0: return 0.125f; // LO
+        case 1: return 0.25f;  // 32'
+        case 2: return 0.5f;   // 16'
+        case 3: return 1.0f;   // 8' (padrao A4 = 440 Hz)
+        case 4: return 2.0f;   // 4'
+        case 5: return 4.0f;   // 2'
+        default: return 1.0f;
     }
 }
 
@@ -152,7 +152,7 @@ float MiniJJMoogAudioProcessor::renderWaveform (double normPhase, int waveIndex,
 
 float MiniJJMoogAudioProcessor::secondsToCoeff (float seconds, double sampleRate)
 {
-    const double clamped = std::max (0.0005, static_cast<double> (seconds));
+    const double clamped = std::max (0.001, static_cast<double> (seconds));
     return static_cast<float> (1.0 - std::exp (-1.0 / (clamped * sampleRate)));
 }
 
@@ -182,6 +182,10 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
 
     oscPhases.fill (0.0);
     lfoPhase = 0.0;
+    targetFreqHz = 261.625565;
+    currentFreqHz = 261.625565;
+    pitchBendSemitones = 0.0f;
+    modWheelAmount = 0.0f;
     filterEnvValue = 0.0f;
     loudnessEnvValue = 0.0f;
 }
@@ -219,14 +223,18 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     if (numChannels <= 0 || numSamples <= 0)
         return;
 
+    constexpr float pitchBendRangeSemis = 2.0f;
+
     for (const auto metadata : midiMessages)
     {
         const auto msg = metadata.getMessage();
         if (msg.isNoteOn())
         {
             currentMidiNote = msg.getNoteNumber();
-            noteVelocity = std::max (0.1f, msg.getFloatVelocity());
-            noteFreqHz = 440.0 * std::pow (2.0, (currentMidiNote - 69) / 12.0);
+            noteVelocity = std::max (0.15f, msg.getFloatVelocity());
+            targetFreqHz = 440.0 * std::pow (2.0, (currentMidiNote - 69) / 12.0);
+            if (! gateHeld)
+                currentFreqHz = targetFreqHz;
             gateHeld = true;
             filterEnvValue = std::max (filterEnvValue, 0.25f);
             loudnessEnvValue = std::max (loudnessEnvValue, 0.25f);
@@ -235,6 +243,17 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         {
             if (msg.getNoteNumber() == currentMidiNote)
                 gateHeld = false;
+        }
+        else if (msg.isPitchWheel())
+        {
+            // Pitch wheel MIDI: 0..16383, centro = 8192
+            const double normBend = (static_cast<double> (msg.getPitchWheelValue()) - 8192.0) / 8192.0;
+            pitchBendSemitones = static_cast<float> (normBend) * pitchBendRangeSemis;
+        }
+        else if (msg.isController() && msg.getControllerNumber() == 1)
+        {
+            // Mod Wheel (CC 1): 0..127
+            modWheelAmount = static_cast<float> (msg.getControllerValue()) / 127.0f;
         }
         else if (msg.isAllNotesOff() || msg.isAllSoundOff())
         {
@@ -286,17 +305,29 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float masterVol     = apvts.getRawParameterValue ("master_vol")->load();
     const bool  mainOutOn     = apvts.getRawParameterValue ("main_out_on")->load() > 0.5f;
 
-    const float fAtkCoeff = secondsToCoeff (fAtk, currentSampleRate);
-    const float fDecCoeff = secondsToCoeff (fDec, currentSampleRate);
-    const float lAtkCoeff = secondsToCoeff (lAtk, currentSampleRate);
-    const float lDecCoeff = secondsToCoeff (lDec, currentSampleRate);
-    const float glideCoeff = glideSec > 0.001f ? secondsToCoeff (glideSec, currentSampleRate) : 1.0f;
+    const float fAtkCoeff     = secondsToCoeff (fAtk, currentSampleRate);
+    const float fDecCoeff     = secondsToCoeff (fDec, currentSampleRate);
+    const float lAtkCoeff     = secondsToCoeff (lAtk, currentSampleRate);
+    const float lDecCoeff     = secondsToCoeff (lDec, currentSampleRate);
+    const float glideCoeff    = glideSec > 0.002f ? secondsToCoeff (glideSec, currentSampleRate) : 1.0f;
 
     moogFilter.setResonance (0.707f + emphasis * 6.5f);
     const float driveGain = 1.0f + overloadAmt * 4.5f;
 
+    // LFO de modulacao (4.5 Hz) combinado com MOD MIX e Mod Wheel (CC 1)
+    const double lfoHz = 4.5;
+    const float effectiveModDepth = juce::jlimit (0.0f, 1.5f, modMix + modWheelAmount * 0.65f);
+
     for (int sample = 0; sample < numSamples; ++sample)
     {
+        // Glide real na frequencia fundamental da nota
+        currentFreqHz += static_cast<double> (glideCoeff) * (targetFreqHz - currentFreqHz);
+
+        // LFO senoidal para modulacao
+        const float lfoWave = static_cast<float> (std::sin (2.0 * juce::MathConstants<double>::pi * lfoPhase));
+        lfoPhase += lfoHz / currentSampleRate;
+        if (lfoPhase >= 1.0) lfoPhase -= 1.0;
+
         if (gateHeld)
         {
             filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
@@ -316,14 +347,18 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             ? (loudnessEnvValue * (1.0f - lDecCoeff * 0.25f) + lSus * (lDecCoeff * 0.25f))
             : loudnessEnvValue;
 
-        const double freq3 = noteFreqHz * rangeToOctaveMultiplier (r3) * semitonesToRatio (f3 + tuneSemis);
+        // Oscilador 3
+        const double freq3 = currentFreqHz * rangeToOctaveMultiplier (r3) * semitonesToRatio (f3 + tuneSemis + pitchBendSemitones);
         const float out3 = renderWaveform (oscPhases[2], w3, 0.22f);
         oscPhases[2] += freq3 / currentSampleRate;
         if (oscPhases[2] >= 1.0) oscPhases[2] -= 1.0;
 
-        const float modPitchSemis = oscModOn ? (out3 * modMix * 3.0f) : 0.0f;
-        const double freq1 = noteFreqHz * rangeToOctaveMultiplier (r1) * semitonesToRatio (f1 + tuneSemis + modPitchSemis);
-        const double freq2 = noteFreqHz * rangeToOctaveMultiplier (r2) * semitonesToRatio (f2 + tuneSemis + modPitchSemis);
+        // Modulacao de pitch (OSC MOD + Pitch Bend + Tune)
+        const float modPitchSemis = oscModOn ? (lfoWave * effectiveModDepth * 2.5f) : 0.0f;
+        const float totalSemisOffset = tuneSemis + pitchBendSemitones + modPitchSemis;
+
+        const double freq1 = currentFreqHz * rangeToOctaveMultiplier (r1) * semitonesToRatio (f1 + totalSemisOffset);
+        const double freq2 = currentFreqHz * rangeToOctaveMultiplier (r2) * semitonesToRatio (f2 + totalSemisOffset);
 
         const float out1 = renderWaveform (oscPhases[0], w1, 0.22f);
         const float out2 = renderWaveform (oscPhases[1], w2, 0.22f);
@@ -334,6 +369,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         oscPhases[1] += freq2 / currentSampleRate;
         if (oscPhases[1] >= 1.0) oscPhases[1] -= 1.0;
 
+        // Ruido (White / Pink)
         const float white = rng.nextFloat() * 2.0f - 1.0f;
         pinkB0 = 0.99886f * pinkB0 + white * 0.0555179f;
         pinkB1 = 0.99332f * pinkB1 + white * 0.0750759f;
@@ -349,9 +385,10 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         float mixed = (out1 * v1 + out2 * v2 + osc3Mix + noiseSample * noiseVol + extVol * 0.0f) * 0.45f;
         mixed = std::tanh (mixed * driveGain);
 
-        const float kbOffset = kbCtrlOn ? ((static_cast<float> (currentMidiNote) - 60.0f) * 28.0f) : 0.0f;
-        const float contourHz = envModLevel * filterContour * 6500.0f;
-        const float lfoCutoffHz = filterModOn ? (out3 * modMix * 2400.0f) : 0.0f;
+        // Cutoff com KB CTRL, Filter Contour e Filter Mod
+        const float kbOffset = kbCtrlOn ? ((static_cast<float> (currentMidiNote) - 60.0f) * 24.0f) : 0.0f;
+        const float contourHz = envModLevel * filterContour * 5500.0f;
+        const float lfoCutoffHz = filterModOn ? (lfoWave * effectiveModDepth * 2600.0f) : 0.0f;
         const float finalCutoff = juce::jlimit (35.0f, 16000.0f, baseCutoff + kbOffset + contourHz + lfoCutoffHz);
 
         moogFilter.setCutoffFrequency (finalCutoff);
@@ -364,8 +401,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             const float filtered = moogFilter.processSample (static_cast<size_t> (ch), shaped);
             buffer.setSample (ch, sample, filtered * outputGain);
         }
-
-        (void) glideCoeff;
     }
 }
 
