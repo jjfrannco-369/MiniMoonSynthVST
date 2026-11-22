@@ -53,13 +53,15 @@ private:
     std::array<double, 3> oscPhases { 0.0, 0.0, 0.0 };
     double lfoPhase = 0.0;
 
-    double targetFreqHz = 261.625565; // C4 (MIDI 60) com A4 = 440 Hz
-    double currentFreqHz = 261.625565;
-    float pitchBendSemitones = 0.0f; // +/- 2 semitons por padrao
-    float modWheelAmount = 0.0f;     // CC 1 (0.0 a 1.0)
+    // Glide exponencial em semitons MIDI (A4 = 69 -> 440 Hz)
+    double targetMidiPitch = 60.0;
+    double currentMidiPitch = 60.0;
+    float pitchBendNorm = 0.0f; // -1.0 a +1.0
+    float modWheelAmount = 0.0f;
 
     float noteVelocity = 0.0f;
     int currentMidiNote = -1;
+    int activeHeldNotes = 0;
     bool gateHeld = false;
 
     float filterEnvValue = 0.0f;
