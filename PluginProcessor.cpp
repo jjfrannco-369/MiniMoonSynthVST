@@ -180,22 +180,20 @@ void MiniJJMoogAudioProcessor::triggerPolyNoteOn (int noteNumber, float vel, int
 {
     int chosenIdx = -1;
 
-    // Reutiliza voz ja tocando a mesma nota se houver
     for (int i = 0; i < activeVoiceCount; ++i)
     {
-        if (voices[i].active && voices[i].midiNote == noteNumber)
+        if (voices[i].midiNote == noteNumber && (voices[i].active || voices[i].noteKeyHeld))
         {
             chosenIdx = i;
             break;
         }
     }
 
-    // Senao, pega voz inativa
     if (chosenIdx < 0)
     {
         for (int i = 0; i < activeVoiceCount; ++i)
         {
-            if (! voices[i].active && voices[i].envLevel < 0.002f)
+            if (! voices[i].active && ! voices[i].noteKeyHeld && voices[i].envLevel < 0.002f)
             {
                 chosenIdx = i;
                 break;
@@ -203,7 +201,6 @@ void MiniJJMoogAudioProcessor::triggerPolyNoteOn (int noteNumber, float vel, int
         }
     }
 
-    // Senao, pega a voz mais antiga (voice stealing)
     if (chosenIdx < 0)
     {
         uint64_t oldestAge = UINT64_MAX;
@@ -221,13 +218,14 @@ void MiniJJMoogAudioProcessor::triggerPolyNoteOn (int noteNumber, float vel, int
         chosenIdx = 0;
 
     auto& v = voices[chosenIdx];
-    const bool wasActive = v.active && v.envLevel > 0.02f;
+    const bool wasActive = (v.active || v.noteKeyHeld) && v.envLevel > 0.02f;
     v.midiNote = noteNumber;
     v.velocity = std::max (0.15f, vel);
     v.targetPitch = static_cast<double> (noteNumber);
     if (! wasActive)
         v.currentPitch = v.targetPitch;
 
+    v.noteKeyHeld = true;
     v.active = true;
     v.ageCounter = ++voiceAgeTick;
     if (! (legatoMode && wasActive))
@@ -240,8 +238,12 @@ void MiniJJMoogAudioProcessor::triggerPolyNoteOff (int noteNumber)
 {
     for (auto& v : voices)
     {
-        if (v.active && v.midiNote == noteNumber)
-            v.active = false;
+        if (v.midiNote == noteNumber)
+        {
+            v.noteKeyHeld = false;
+            if (! sustainPedalDown)
+                v.active = false;
+        }
     }
 }
 
@@ -273,6 +275,7 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     for (auto& v : voices)
     {
         v.active = false;
+        v.noteKeyHeld = false;
         v.midiNote = 60;
         v.velocity = 0.0f;
         v.targetPitch = 60.0;
@@ -289,6 +292,7 @@ void MiniJJMoogAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     pitchBendNorm = 0.0f;
     smoothedBendNorm = 0.0f;
     modWheelAmount = 0.0f;
+    sustainPedalDown = false;
     heldNotes.clear();
     currentMidiNote = 60;
     gateHeld = false;
@@ -358,7 +362,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                 {
                     currentMidiNote = noteNum;
                     targetMidiPitch = static_cast<double> (currentMidiNote);
-                    if (! hadHeldNotes && ! gateHeld)
+                    if (! hadHeldNotes && ! gateHeld && ! sustainPedalDown)
                         currentMidiPitch = targetMidiPitch;
                 }
                 else
@@ -370,7 +374,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
                 gateHeld = true;
 
-                const bool isLegatoSlide = legatoMode && hadHeldNotes;
+                const bool isLegatoSlide = legatoMode && (hadHeldNotes || sustainPedalDown);
                 if (! isLegatoSlide)
                 {
                     filterEnvValue = std::max (filterEnvValue, 0.25f);
@@ -396,7 +400,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                     targetMidiPitch = static_cast<double> (currentMidiNote);
                     gateHeld = true;
                 }
-                else
+                else if (! sustainPedalDown)
                 {
                     gateHeld = false;
                 }
@@ -407,15 +411,41 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             const double norm = (static_cast<double> (msg.getPitchWheelValue()) - 8192.0) / 8192.0;
             pitchBendNorm = static_cast<float> (juce::jlimit (-1.0, 1.0, norm));
         }
-        else if (msg.isController() && msg.getControllerNumber() == 1)
+        else if (msg.isController())
         {
-            modWheelAmount = static_cast<float> (msg.getControllerValue()) / 127.0f;
+            const int ccNum = msg.getControllerNumber();
+            if (ccNum == 1)
+            {
+                modWheelAmount = static_cast<float> (msg.getControllerValue()) / 127.0f;
+            }
+            else if (ccNum == 64 || msg.isSustainPedalOn() || msg.isSustainPedalOff())
+            {
+                const bool down = msg.isSustainPedalOn() || (ccNum == 64 && msg.getControllerValue() >= 64);
+                sustainPedalDown = down;
+
+                if (! sustainPedalDown)
+                {
+                    // Ao soltar o pedal de sustain, encerra vozes cujas teclas ja foram soltas
+                    for (auto& v : voices)
+                    {
+                        if (! v.noteKeyHeld)
+                            v.active = false;
+                    }
+
+                    if (heldNotes.empty())
+                        gateHeld = false;
+                }
+            }
         }
         else if (msg.isAllNotesOff() || msg.isAllSoundOff())
         {
             heldNotes.clear();
             for (auto& v : voices)
+            {
                 v.active = false;
+                v.noteKeyHeld = false;
+            }
+            sustainPedalDown = false;
             gateHeld = false;
             noteVelocity = 0.0f;
         }
@@ -475,7 +505,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         ? 1.0
         : (1.0 - std::exp (-1.0 / (glideTau * currentSampleRate)));
 
-    // Suavizacao gradativa (~18 ms) para evitar degraus mesmo em movimentos bruscos do Pitch Bend
     const float bendSmoothCoeff = secondsToCoeff (0.018f, currentSampleRate);
 
     moogFilter.setResonance (0.707f + emphasis * 6.5f);
@@ -484,6 +513,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     const double lfoHz = 4.5;
     const float effectiveModDepth = juce::jlimit (0.0f, 1.5f, modMix + modWheelAmount * 0.65f);
+    const bool envGateActive = gateHeld || sustainPedalDown;
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
@@ -513,7 +543,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             currentMidiPitch += expGlideStep * (targetMidiPitch - currentMidiPitch);
             const double glidedFreqHz = 440.0 * std::pow (2.0, (currentMidiPitch - 69.0) / 12.0);
 
-            if (gateHeld)
+            if (envGateActive)
             {
                 filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
                 loudnessEnvValue += lAtkCoeff * (1.0f - loudnessEnvValue);
@@ -524,11 +554,11 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                 loudnessEnvValue += lDecCoeff * (0.0f - loudnessEnvValue);
             }
 
-            activeEnvForFilter = gateHeld
+            activeEnvForFilter = envGateActive
                 ? (filterEnvValue * (1.0f - fDecCoeff * 0.35f) + fSus * (fDecCoeff * 0.35f))
                 : filterEnvValue;
 
-            const float ampLevel = gateHeld
+            const float ampLevel = envGateActive
                 ? (loudnessEnvValue * (1.0f - lDecCoeff * 0.25f) + lSus * (lDecCoeff * 0.25f))
                 : loudnessEnvValue;
 
