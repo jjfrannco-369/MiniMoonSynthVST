@@ -69,6 +69,7 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
 {
     const bool isOn = button.getToggleState();
     auto bounds = button.getLocalBounds().toFloat();
+    const juce::String txt = button.getButtonText();
 
     SwitchAccent acc = SwitchAccent::yellow;
     const auto it = accents.find (&button);
@@ -88,8 +89,40 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
         inactiveCol = juce::Colour (0xff163869);
     }
 
+    const bool isCompactTrackButton = (txt == "1/3" || txt == "2/3" || txt == "FULL");
+
+    if (isCompactTrackButton)
+    {
+        const float btnW = std::min (24.0f, bounds.getWidth() - 6.0f);
+        const float btnH = 13.0f;
+        const float btnX = bounds.getCentreX() - btnW * 0.5f;
+        const float btnY = bounds.getY() + 2.0f;
+
+        g.setColour (juce::Colour (0xff0b0b0c));
+        g.fillRoundedRectangle (btnX + 1.0f, btnY + 1.0f, btnW, btnH, 2.5f);
+
+        g.setColour (isOn ? activeCol : inactiveCol);
+        g.fillRoundedRectangle (btnX, btnY, btnW, btnH, 2.5f);
+
+        g.setColour (juce::Colour (0xff141416));
+        g.drawRoundedRectangle (btnX, btnY, btnW, btnH, 2.5f, 1.0f);
+
+        const float ledR = 3.2f;
+        const float ledY = btnY + btnH + 5.0f;
+        const float ledX = bounds.getCentreX();
+
+        g.setColour (isOn ? juce::Colour (0xffff2424) : juce::Colour (0xff381010));
+        g.fillEllipse (ledX - ledR, ledY - ledR, ledR * 2.0f, ledR * 2.0f);
+
+        auto labelArea = bounds.withTop (ledY + ledR + 2.0f);
+        g.setColour (juce::Colour (0xfff5f2eb));
+        g.setFont (juce::Font (9.0f, juce::Font::bold));
+        g.drawFittedText (txt, labelArea.toNearestInt(), juce::Justification::centred, 1);
+        return;
+    }
+
     const float btnW = 24.0f;
-    const float btnH = 15.0f;
+    const float btnH = 14.0f;
     const float btnX = bounds.getX() + 2.0f;
     const float btnY = bounds.getCentreY() - btnH * 0.5f;
 
@@ -105,8 +138,8 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
     g.setColour (juce::Colour (0xff141416));
     g.drawRoundedRectangle (btnX, btnY, btnW, btnH, 3.0f, 1.0f);
 
-    const float ledR = 4.5f;
-    const float ledCx = btnX + btnW + 9.0f;
+    const float ledR = 4.2f;
+    const float ledCx = btnX + btnW + 8.5f;
     const float ledCy = bounds.getCentreY();
 
     g.setColour (juce::Colour (0xff3a352f));
@@ -125,10 +158,10 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
         g.fillEllipse (ledCx - ledR, ledCy - ledR, ledR * 2.0f, ledR * 2.0f);
     }
 
-    auto textRect = bounds.withTrimmedLeft (ledCx + ledR + 6.0f);
+    auto textRect = bounds.withTrimmedLeft (ledCx + ledR + 5.0f);
     g.setColour (juce::Colour (0xfff5f2eb));
-    g.setFont (juce::Font (10.0f, juce::Font::bold));
-    g.drawFittedText (button.getButtonText(), textRect.toNearestInt(), juce::Justification::centredLeft, 1);
+    g.setFont (juce::Font (9.8f, juce::Font::bold));
+    g.drawFittedText (txt, textRect.toNearestInt(), juce::Justification::centredLeft, 1);
 }
 
 MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioProcessor& p)
@@ -146,10 +179,12 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     setupKnob   (glideSlider, glideLabel, "GLIDE");
     setupKnob   (pbRangeSlider, pbRangeLabel, "PB RNG");
     setupKnob   (modMixSlider, modMixLabel, "MOD MIX");
+    setupKnob   (lfoRateSlider, lfoRateLabel, "LFO RATE");
     setupCombo  (voiceModeBox, voiceModeLabel, "POLY MODE", polyChoices);
     setupToggle (oscModBtn, "OSC MOD", MiniMoonLookAndFeel::SwitchAccent::yellow);
     setupToggle (osc3CtrlBtn, "OSC 3 CTRL", MiniMoonLookAndFeel::SwitchAccent::blue);
     setupToggle (legatoBtn, "LEGATO", MiniMoonLookAndFeel::SwitchAccent::red);
+    setupToggle (retriggerBtn, "RETRIG", MiniMoonLookAndFeel::SwitchAccent::yellow);
 
     // OSCILLATOR BANK
     setupCombo (osc1RangeBox, osc1RangeLabel, "RNG 1", rangeChoices);
@@ -175,7 +210,17 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
 
     // MODIFIERS
     setupToggle (filterModBtn, "FLT MOD", MiniMoonLookAndFeel::SwitchAccent::yellow);
-    setupToggle (kbCtrlBtn, "KB CTRL", MiniMoonLookAndFeel::SwitchAccent::blue);
+
+    kbTrackLabel.setText ("KB TRACKING", juce::dontSendNotification);
+    kbTrackLabel.setJustificationType (juce::Justification::centred);
+    kbTrackLabel.setColour (juce::Label::textColourId, juce::Colour (0xfff5f2eb));
+    kbTrackLabel.setFont (juce::Font (9.2f, juce::Font::bold));
+    addAndMakeVisible (kbTrackLabel);
+
+    setupToggle (kbTrk1Btn, "1/3",  MiniMoonLookAndFeel::SwitchAccent::blue);
+    setupToggle (kbTrk2Btn, "2/3",  MiniMoonLookAndFeel::SwitchAccent::blue);
+    setupToggle (kbTrk3Btn, "FULL", MiniMoonLookAndFeel::SwitchAccent::red);
+
     setupKnob   (cutoffSlider, cutoffLabel, "CUTOFF");
     setupKnob   (emphasisSlider, emphasisLabel, "EMPHASIS");
     setupKnob   (contourSlider, contourLabel, "CONTOUR");
@@ -197,10 +242,12 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     glideAtt      = std::make_unique<SliderAttachment> (tree, "glide", glideSlider);
     pbRangeAtt    = std::make_unique<SliderAttachment> (tree, "pitch_bend_range", pbRangeSlider);
     modMixAtt     = std::make_unique<SliderAttachment> (tree, "mod_mix", modMixSlider);
+    lfoRateAtt    = std::make_unique<SliderAttachment> (tree, "lfo_rate", lfoRateSlider);
     voiceModeAtt  = std::make_unique<ComboAttachment>  (tree, "voice_mode", voiceModeBox);
     oscModAtt     = std::make_unique<ButtonAttachment> (tree, "osc_mod_on", oscModBtn);
     osc3CtrlAtt   = std::make_unique<ButtonAttachment> (tree, "osc3_ctrl_on", osc3CtrlBtn);
     legatoAtt     = std::make_unique<ButtonAttachment> (tree, "legato_on", legatoBtn);
+    retriggerAtt  = std::make_unique<ButtonAttachment> (tree, "retrigger_on", retriggerBtn);
 
     osc1RangeAtt  = std::make_unique<ComboAttachment>  (tree, "osc1_range", osc1RangeBox);
     osc1FreqAtt   = std::make_unique<SliderAttachment> (tree, "osc1_freq", osc1FreqSlider);
@@ -223,7 +270,10 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     overloadAtt   = std::make_unique<SliderAttachment> (tree, "overload", overloadSlider);
 
     filterModAtt  = std::make_unique<ButtonAttachment> (tree, "filter_mod_on", filterModBtn);
-    kbCtrlAtt     = std::make_unique<ButtonAttachment> (tree, "kb_ctrl_on", kbCtrlBtn);
+    kbTrk1Att     = std::make_unique<ButtonAttachment> (tree, "kb_trk_1", kbTrk1Btn);
+    kbTrk2Att     = std::make_unique<ButtonAttachment> (tree, "kb_trk_2", kbTrk2Btn);
+    kbTrk3Att     = std::make_unique<ButtonAttachment> (tree, "kb_trk_3", kbTrk3Btn);
+
     cutoffAtt     = std::make_unique<SliderAttachment> (tree, "cutoff", cutoffSlider);
     emphasisAtt   = std::make_unique<SliderAttachment> (tree, "emphasis", emphasisSlider);
     contourAtt    = std::make_unique<SliderAttachment> (tree, "filter_contour", contourSlider);
@@ -421,18 +471,20 @@ void MiniJJMoogAudioProcessorEditor::resized()
         const int w0 = colW[0];
         const int y0 = panel.getY() + topBar + 2;
         const int kw = w0 / 2;
-        const int kh = 72;
+        const int kh = 68;
 
         placeKnob  (tuneSlider, tuneLabel, x0, y0, kw, kh);
         placeKnob  (glideSlider, glideLabel, x0 + kw, y0, kw, kh);
         placeKnob  (pbRangeSlider, pbRangeLabel, x0, y0 + kh, kw, kh);
         placeKnob  (modMixSlider, modMixLabel, x0 + kw, y0 + kh, kw, kh);
-        placeCombo (voiceModeBox, voiceModeLabel, x0 + 2, y0 + kh * 2, w0 - 4, 38);
+        placeKnob  (lfoRateSlider, lfoRateLabel, x0, y0 + kh * 2, kw, kh);
+        placeCombo (voiceModeBox, voiceModeLabel, x0 + kw, y0 + kh * 2 + 4, kw, 38);
 
-        const int by = y0 + kh * 2 + 40;
-        oscModBtn.setBounds   (x0 + 6, by, w0 - 12, 20);
-        osc3CtrlBtn.setBounds (x0 + 6, by + 22, w0 - 12, 20);
-        legatoBtn.setBounds   (x0 + 6, by + 44, w0 - 12, 20);
+        const int by = y0 + kh * 3 + 4;
+        oscModBtn.setBounds    (x0 + 6, by, kw - 6, 19);
+        osc3CtrlBtn.setBounds  (x0 + kw + 2, by, kw - 4, 19);
+        legatoBtn.setBounds    (x0 + 6, by + 20, kw - 6, 19);
+        retriggerBtn.setBounds (x0 + kw + 2, by + 20, kw - 4, 19);
     }
 
     // 2. OSCILLATOR BANK
@@ -475,7 +527,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
         placeKnob  (overloadSlider, overloadLabel, x0, y0 + kh * 3, kw, kh);
     }
 
-    // 4. MODIFIERS
+    // 4. MODIFIERS (3 botoes horizontais lado a lado: 1/3, 2/3, FULL)
     {
         const int x0 = colX[3];
         const int w0 = colW[3];
@@ -483,8 +535,15 @@ void MiniJJMoogAudioProcessorEditor::resized()
         const int kw = w0 / 3;
         const int kh = 84;
 
-        filterModBtn.setBounds (x0 + 6, y0 + 10, kw - 6, 22);
-        kbCtrlBtn.setBounds    (x0 + 6, y0 + 36, kw - 6, 22);
+        filterModBtn.setBounds (x0 + 6, y0 + 4, kw - 6, 19);
+        kbTrackLabel.setBounds (x0 + 2, y0 + 25, kw - 4, 12);
+
+        const int subW = std::max (20, (kw - 6) / 3);
+        const int subH = 34;
+        kbTrk1Btn.setBounds (x0 + 3,            y0 + 38, subW, subH);
+        kbTrk2Btn.setBounds (x0 + 3 + subW,     y0 + 38, subW, subH);
+        kbTrk3Btn.setBounds (x0 + 3 + subW * 2, y0 + 38, subW, subH);
+
         placeKnob (contourSlider, contourLabel, x0 + kw, y0, kw, kh);
         placeKnob (cutoffSlider, cutoffLabel, x0 + kw * 2, y0, kw, kh);
 
