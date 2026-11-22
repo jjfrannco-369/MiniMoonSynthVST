@@ -4,6 +4,17 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
 
+class MiniMoonLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
+                          float sliderPosProportional, float rotaryStartAngle,
+                          float rotaryEndAngle, juce::Slider& slider) override;
+
+    void drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
+                          bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+};
+
 class MiniJJMoogAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
@@ -23,25 +34,26 @@ private:
     void setupToggle (juce::ToggleButton& btn, const juce::String& text);
 
     MiniJJMoogAudioProcessor& audioProcessor;
+    MiniMoonLookAndFeel miniMoonLookAndFeel;
 
-    // Controllers
-    juce::Slider tuneSlider, glideSlider, modMixSlider;
-    juce::Label tuneLabel, glideLabel, modMixLabel;
-    juce::ToggleButton oscModBtn, osc3CtrlBtn;
+    // CONTROLLERS
+    juce::Slider tuneSlider, glideSlider, pbRangeSlider, modMixSlider;
+    juce::Label tuneLabel, glideLabel, pbRangeLabel, modMixLabel;
+    juce::ToggleButton oscModBtn, osc3CtrlBtn, legatoBtn;
 
-    // Oscillator Bank
+    // OSCILLATOR BANK
     juce::ComboBox osc1RangeBox, osc1WaveBox, osc2RangeBox, osc2WaveBox, osc3RangeBox, osc3WaveBox;
     juce::Label osc1RangeLabel, osc1WaveLabel, osc2RangeLabel, osc2WaveLabel, osc3RangeLabel, osc3WaveLabel;
     juce::Slider osc1FreqSlider, osc2FreqSlider, osc3FreqSlider;
     juce::Label osc1FreqLabel, osc2FreqLabel, osc3FreqLabel;
 
-    // Mixer
+    // MIXER
     juce::Slider osc1VolSlider, osc2VolSlider, osc3VolSlider, noiseVolSlider, extVolSlider, overloadSlider;
     juce::Label osc1VolLabel, osc2VolLabel, osc3VolLabel, noiseVolLabel, extVolLabel, overloadLabel;
     juce::ComboBox noiseColorBox;
     juce::Label noiseColorLabel;
 
-    // Modifiers
+    // MODIFIERS
     juce::ToggleButton filterModBtn, kbCtrlBtn;
     juce::Slider cutoffSlider, emphasisSlider, contourSlider;
     juce::Label cutoffLabel, emphasisLabel, contourLabel;
@@ -50,14 +62,14 @@ private:
     juce::Slider lAtkSlider, lDecSlider, lSusSlider;
     juce::Label lAtkLabel, lDecLabel, lSusLabel;
 
-    // Output
+    // OUTPUT
     juce::Slider masterVolSlider;
     juce::Label masterVolLabel;
     juce::ToggleButton mainOutBtn;
 
     // Attachments
-    std::unique_ptr<SliderAttachment> tuneAtt, glideAtt, modMixAtt;
-    std::unique_ptr<ButtonAttachment> oscModAtt, osc3CtrlAtt;
+    std::unique_ptr<SliderAttachment> tuneAtt, glideAtt, pbRangeAtt, modMixAtt;
+    std::unique_ptr<ButtonAttachment> oscModAtt, osc3CtrlAtt, legatoAtt;
 
     std::unique_ptr<ComboAttachment> osc1RangeAtt, osc1WaveAtt, osc2RangeAtt, osc2WaveAtt, osc3RangeAtt, osc3WaveAtt;
     std::unique_ptr<SliderAttachment> osc1FreqAtt, osc2FreqAtt, osc3FreqAtt;
