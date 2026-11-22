@@ -38,25 +38,25 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
 
     // OSCILLATOR BANK (1, 2, 3)
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc1_range", "Osc 1 Range", rangeChoices, 2)); // 16'
+        "osc1_range", "Osc 1 Range", rangeChoices, 2));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc1_freq", "Osc 1 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc1_wave", "Osc 1 Wave", waveChoices, 2)); // Saw
+        "osc1_wave", "Osc 1 Wave", waveChoices, 2));
 
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc2_range", "Osc 2 Range", rangeChoices, 2)); // 16'
+        "osc2_range", "Osc 2 Range", rangeChoices, 2));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc2_freq", "Osc 2 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), -0.08f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc2_wave", "Osc 2 Wave", waveChoices, 2)); // Saw
+        "osc2_wave", "Osc 2 Wave", waveChoices, 2));
 
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc3_range", "Osc 3 Range", rangeChoices, 1)); // 32'
+        "osc3_range", "Osc 3 Range", rangeChoices, 1));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "osc3_freq", "Osc 3 Freq", juce::NormalisableRange<float> (-7.0f, 7.0f, 0.01f), 0.0f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        "osc3_wave", "Osc 3 Wave", waveChoices, 3)); // Square
+        "osc3_wave", "Osc 3 Wave", waveChoices, 3));
 
     // MIXER
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -74,7 +74,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "overload", "Overload", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.15f));
 
-    // MODIFIERS (Filter + Loudness Contour)
+    // MODIFIERS
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "filter_mod_on", "Filter Mod", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
@@ -113,12 +113,12 @@ float MiniJJMoogAudioProcessor::rangeToOctaveMultiplier (int rangeIndex)
 {
     switch (rangeIndex)
     {
-        case 0: return 0.125f; // LO (sub-grave / LFO-like)
-        case 1: return 0.25f;  // 32'
-        case 2: return 0.5f;   // 16'
-        case 3: return 1.0f;   // 8'
-        case 4: return 2.0f;   // 4'
-        case 5: return 4.0f;   // 2'
+        case 0: return 0.125f;
+        case 1: return 0.25f;
+        case 2: return 0.5f;
+        case 3: return 1.0f;
+        case 4: return 2.0f;
+        case 5: return 4.0f;
         default: return 0.5f;
     }
 }
@@ -156,16 +156,11 @@ float MiniJJMoogAudioProcessor::secondsToCoeff (float seconds, double sampleRate
     return static_cast<float> (1.0 - std::exp (-1.0 / (clamped * sampleRate)));
 }
 
-const juce::String MiniJJMoogAudioProcessor::getName() const
-{
-    return "Mini JJ Moog";
-}
-
+const juce::String MiniJJMoogAudioProcessor::getName() const { return "Mini JJ Moog"; }
 bool MiniJJMoogAudioProcessor::acceptsMidi() const { return true; }
 bool MiniJJMoogAudioProcessor::producesMidi() const { return false; }
 bool MiniJJMoogAudioProcessor::isMidiEffect() const { return false; }
 double MiniJJMoogAudioProcessor::getTailLengthSeconds() const { return 0.0; }
-
 int MiniJJMoogAudioProcessor::getNumPrograms() { return 1; }
 int MiniJJMoogAudioProcessor::getCurrentProgram() { return 0; }
 void MiniJJMoogAudioProcessor::setCurrentProgram (int) {}
@@ -248,48 +243,48 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         }
     }
 
-    const float tuneSemis      = apvts.getRawParameterValue ("tune")->load();
-    const float glideSec       = apvts.getRawParameterValue ("glide")->load();
-    const float modMix         = apvts.getRawParameterValue ("mod_mix")->load();
-    const bool  oscModOn       = apvts.getRawParameterValue ("osc_mod_on")->load() > 0.5f;
-    const bool  osc3CtrlOn     = apvts.getRawParameterValue ("osc3_ctrl_on")->load() > 0.5f;
+    const float tuneSemis     = apvts.getRawParameterValue ("tune")->load();
+    const float glideSec      = apvts.getRawParameterValue ("glide")->load();
+    const float modMix        = apvts.getRawParameterValue ("mod_mix")->load();
+    const bool  oscModOn      = apvts.getRawParameterValue ("osc_mod_on")->load() > 0.5f;
+    const bool  osc3CtrlOn    = apvts.getRawParameterValue ("osc3_ctrl_on")->load() > 0.5f;
 
-    const int   r1             = static_cast<int> (apvts.getRawParameterValue ("osc1_range")->load());
-    const float f1             = apvts.getRawParameterValue ("osc1_freq")->load();
-    const int   w1             = static_cast<int> (apvts.getRawParameterValue ("osc1_wave")->load());
+    const int   r1            = static_cast<int> (apvts.getRawParameterValue ("osc1_range")->load());
+    const float f1            = apvts.getRawParameterValue ("osc1_freq")->load();
+    const int   w1            = static_cast<int> (apvts.getRawParameterValue ("osc1_wave")->load());
 
-    const int   r2             = static_cast<int> (apvts.getRawParameterValue ("osc2_range")->load());
-    const float f2             = apvts.getRawParameterValue ("osc2_freq")->load();
-    const int   w2             = static_cast<int> (apvts.getRawParameterValue ("osc2_wave")->load());
+    const int   r2            = static_cast<int> (apvts.getRawParameterValue ("osc2_range")->load());
+    const float f2            = apvts.getRawParameterValue ("osc2_freq")->load();
+    const int   w2            = static_cast<int> (apvts.getRawParameterValue ("osc2_wave")->load());
 
-    const int   r3             = static_cast<int> (apvts.getRawParameterValue ("osc3_range")->load());
-    const float f3             = apvts.getRawParameterValue ("osc3_freq")->load();
-    const int   w3             = static_cast<int> (apvts.getRawParameterValue ("osc3_wave")->load());
+    const int   r3            = static_cast<int> (apvts.getRawParameterValue ("osc3_range")->load());
+    const float f3            = apvts.getRawParameterValue ("osc3_freq")->load();
+    const int   w3            = static_cast<int> (apvts.getRawParameterValue ("osc3_wave")->load());
 
-    const float v1             = apvts.getRawParameterValue ("osc1_vol")->load();
-    const float v2             = apvts.getRawParameterValue ("osc2_vol")->load();
-    const float v3             = apvts.getRawParameterValue ("osc3_vol")->load();
-    const float noiseVol       = apvts.getRawParameterValue ("noise_vol")->load();
-    const int   noiseType      = static_cast<int> (apvts.getRawParameterValue ("noise_color")->load());
-    const float extVol         = apvts.getRawParameterValue ("ext_vol")->load();
-    const float overloadAmt    = apvts.getRawParameterValue ("overload")->load();
+    const float v1            = apvts.getRawParameterValue ("osc1_vol")->load();
+    const float v2            = apvts.getRawParameterValue ("osc2_vol")->load();
+    const float v3            = apvts.getRawParameterValue ("osc3_vol")->load();
+    const float noiseVol      = apvts.getRawParameterValue ("noise_vol")->load();
+    const int   noiseType     = static_cast<int> (apvts.getRawParameterValue ("noise_color")->load());
+    const float extVol        = apvts.getRawParameterValue ("ext_vol")->load();
+    const float overloadAmt   = apvts.getRawParameterValue ("overload")->load();
 
-    const bool  filterModOn    = apvts.getRawParameterValue ("filter_mod_on")->load() > 0.5f;
-    const bool  kbCtrlOn       = apvts.getRawParameterValue ("kb_ctrl_on")->load() > 0.5f;
-    const float baseCutoff     = apvts.getRawParameterValue ("cutoff")->load();
-    const float emphasis       = apvts.getRawParameterValue ("emphasis")->load();
-    const float filterContour  = apvts.getRawParameterValue ("filter_contour")->load();
+    const bool  filterModOn   = apvts.getRawParameterValue ("filter_mod_on")->load() > 0.5f;
+    const bool  kbCtrlOn      = apvts.getRawParameterValue ("kb_ctrl_on")->load() > 0.5f;
+    const float baseCutoff    = apvts.getRawParameterValue ("cutoff")->load();
+    const float emphasis      = apvts.getRawParameterValue ("emphasis")->load();
+    const float filterContour = apvts.getRawParameterValue ("filter_contour")->load();
 
-    const float fAtk           = apvts.getRawParameterValue ("filter_attack")->load();
-    const float fDec           = apvts.getRawParameterValue ("filter_decay")->load();
-    const float fSus           = apvts.getRawParameterValue ("filter_sustain")->load();
+    const float fAtk          = apvts.getRawParameterValue ("filter_attack")->load();
+    const float fDec          = apvts.getRawParameterValue ("filter_decay")->load();
+    const float fSus          = apvts.getRawParameterValue ("filter_sustain")->load();
 
-    const float lAtk           = apvts.getRawParameterValue ("loud_attack")->load();
-    const float lDec           = apvts.getRawParameterValue ("loud_decay")->load();
-    const float lSus           = apvts.getRawParameterValue ("loud_sustain")->load();
+    const float lAtk          = apvts.getRawParameterValue ("loud_attack")->load();
+    const float lDec          = apvts.getRawParameterValue ("loud_decay")->load();
+    const float lSus          = apvts.getRawParameterValue ("loud_sustain")->load();
 
-    const float masterVol      = apvts.getRawParameterValue ("master_vol")->load();
-    const bool  mainOutOn      = apvts.getRawParameterValue ("main_out_on")->load() > 0.5f;
+    const float masterVol     = apvts.getRawParameterValue ("master_vol")->load();
+    const bool  mainOutOn     = apvts.getRawParameterValue ("main_out_on")->load() > 0.5f;
 
     const float fAtkCoeff = secondsToCoeff (fAtk, currentSampleRate);
     const float fDecCoeff = secondsToCoeff (fDec, currentSampleRate);
@@ -297,14 +292,11 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float lDecCoeff = secondsToCoeff (lDec, currentSampleRate);
     const float glideCoeff = glideSec > 0.001f ? secondsToCoeff (glideSec, currentSampleRate) : 1.0f;
 
-    const float qVal = 0.707f + emphasis * 6.5f;
-    moogFilter.setResonance (qVal);
-
+    moogFilter.setResonance (0.707f + emphasis * 6.5f);
     const float driveGain = 1.0f + overloadAmt * 4.5f;
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        // Envelopes (Filter & Loudness Contour)
         if (gateHeld)
         {
             filterEnvValue += fAtkCoeff * (1.0f - filterEnvValue);
@@ -312,8 +304,8 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         }
         else
         {
-            filterEnvValue += fDecCoeff * (fSus * 0.0f - filterEnvValue);
-            loudnessEnvValue += lDecCoeff * (lSus * 0.0f - loudnessEnvValue);
+            filterEnvValue += fDecCoeff * (0.0f - filterEnvValue);
+            loudnessEnvValue += lDecCoeff * (0.0f - loudnessEnvValue);
         }
 
         const float envModLevel = gateHeld
@@ -324,13 +316,11 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             ? (loudnessEnvValue * (1.0f - lDecCoeff * 0.25f) + lSus * (lDecCoeff * 0.25f))
             : loudnessEnvValue;
 
-        // Oscilador 3 (pode atuar também como modulador LFO)
         const double freq3 = noteFreqHz * rangeToOctaveMultiplier (r3) * semitonesToRatio (f3 + tuneSemis);
         const float out3 = renderWaveform (oscPhases[2], w3, 0.22f);
         oscPhases[2] += freq3 / currentSampleRate;
         if (oscPhases[2] >= 1.0) oscPhases[2] -= 1.0;
 
-        // Oscilador 1 & 2
         const float modPitchSemis = oscModOn ? (out3 * modMix * 3.0f) : 0.0f;
         const double freq1 = noteFreqHz * rangeToOctaveMultiplier (r1) * semitonesToRatio (f1 + tuneSemis + modPitchSemis);
         const double freq2 = noteFreqHz * rangeToOctaveMultiplier (r2) * semitonesToRatio (f2 + tuneSemis + modPitchSemis);
@@ -344,7 +334,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         oscPhases[1] += freq2 / currentSampleRate;
         if (oscPhases[1] >= 1.0) oscPhases[1] -= 1.0;
 
-        // Noise (White / Pink)
         const float white = rng.nextFloat() * 2.0f - 1.0f;
         pinkB0 = 0.99886f * pinkB0 + white * 0.0555179f;
         pinkB1 = 0.99332f * pinkB1 + white * 0.0750759f;
@@ -356,13 +345,10 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         pinkB6 = white * 0.115926f;
         const float noiseSample = (noiseType == 1) ? pink : white;
 
-        const float osc3AudioMix = osc3CtrlOn ? 0.0f : v3;
-        float mixed = (out1 * v1 + out2 * v2 + out3AudioMix * v3 + noiseSample * noiseVol) * 0.45f;
-
-        // Overload / saturação analógica antes do filtro
+        const float osc3Mix = osc3CtrlOn ? 0.0f : (out3 * v3);
+        float mixed = (out1 * v1 + out2 * v2 + osc3Mix + noiseSample * noiseVol + extVol * 0.0f) * 0.45f;
         mixed = std::tanh (mixed * driveGain);
 
-        // Cutoff dinâmico com Filter Contour, Keyboard Control e Filter Mod
         const float kbOffset = kbCtrlOn ? ((static_cast<float> (currentMidiNote) - 60.0f) * 28.0f) : 0.0f;
         const float contourHz = envModLevel * filterContour * 6500.0f;
         const float lfoCutoffHz = filterModOn ? (out3 * modMix * 2400.0f) : 0.0f;
