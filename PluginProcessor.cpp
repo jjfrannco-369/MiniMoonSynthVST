@@ -35,6 +35,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
         "pitch_bend_range", "PB Range", juce::NormalisableRange<float> (1.0f, 24.0f, 1.0f), 12.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "mod_mix", "Mod Mix", juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.35f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        "lfo_rate", "LFO Rate", juce::NormalisableRange<float> (0.2f, 15.0f, 0.05f, 0.5f), 4.5f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         "voice_mode", "Poly Mode", polyChoices, 0));
     layout.add (std::make_unique<juce::AudioParameterBool> (
@@ -43,6 +45,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
         "osc3_ctrl_on", "Osc 3 Ctrl", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "legato_on", "Legato", true));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        "retrigger_on", "Retrigger", true));
 
     // OSCILLATOR BANK
     layout.add (std::make_unique<juce::AudioParameterChoice> (
@@ -86,7 +90,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiniJJMoogAudioProcessor::cr
     layout.add (std::make_unique<juce::AudioParameterBool> (
         "filter_mod_on", "Filter Mod", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        "kb_ctrl_on", "Keyboard Control", true));
+        "kb_trk_1", "KB Track 1/3", true));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        "kb_trk_2", "KB Track 2/3", true));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        "kb_trk_3", "KB Track Full", false));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         "cutoff", "Cutoff", juce::NormalisableRange<float> (30.0f, 14000.0f, 1.0f, 0.32f), 3200.0f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -338,6 +346,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const int activeVoiceCount = voiceModeToCount (voiceModeIdx);
     const bool isPoly = activeVoiceCount > 1;
     const bool legatoMode = apvts.getRawParameterValue ("legato_on")->load() > 0.5f;
+    const bool retriggerFilter = apvts.getRawParameterValue ("retrigger_on")->load() > 0.5f;
 
     for (const auto metadata : midiMessages)
     {
@@ -350,6 +359,8 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             if (isPoly)
             {
                 triggerPolyNoteOn (noteNum, vel, activeVoiceCount, legatoMode);
+                if (retriggerFilter)
+                    filterEnvStage = EnvStage::attack;
             }
             else
             {
@@ -374,9 +385,12 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                 }
 
                 gateHeld = true;
-                filterEnvStage = EnvStage::attack;
 
-                const bool isLegatoSlide = legatoMode && (hadHeldNotes || sustainPedalDown);
+                const bool isOverlapping = hadHeldNotes || sustainPedalDown;
+                if (retriggerFilter || ! isOverlapping)
+                    filterEnvStage = EnvStage::attack;
+
+                const bool isLegatoSlide = legatoMode && isOverlapping;
                 if (! isLegatoSlide)
                 {
                     loudnessEnvValue = std::max (loudnessEnvValue, 0.25f);
@@ -460,6 +474,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float glideSec      = apvts.getRawParameterValue ("glide")->load();
     const float pbRangeSemis  = apvts.getRawParameterValue ("pitch_bend_range")->load();
     const float modMix        = apvts.getRawParameterValue ("mod_mix")->load();
+    const float lfoRateHz     = apvts.getRawParameterValue ("lfo_rate")->load();
     const bool  oscModOn      = apvts.getRawParameterValue ("osc_mod_on")->load() > 0.5f;
     const bool  osc3CtrlOn    = apvts.getRawParameterValue ("osc3_ctrl_on")->load() > 0.5f;
 
@@ -484,7 +499,16 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float overloadAmt   = apvts.getRawParameterValue ("overload")->load();
 
     const bool  filterModOn   = apvts.getRawParameterValue ("filter_mod_on")->load() > 0.5f;
-    const bool  kbCtrlOn      = apvts.getRawParameterValue ("kb_ctrl_on")->load() > 0.5f;
+    const bool  kbTrk1        = apvts.getRawParameterValue ("kb_trk_1")->load() > 0.5f;
+    const bool  kbTrk2        = apvts.getRawParameterValue ("kb_trk_2")->load() > 0.5f;
+    const bool  kbTrk3        = apvts.getRawParameterValue ("kb_trk_3")->load() > 0.5f;
+
+    float kbTrackAmount = 0.0f;
+    if (kbTrk3)
+        kbTrackAmount = 1.0f;
+    else
+        kbTrackAmount = (kbTrk1 ? 0.333f : 0.0f) + (kbTrk2 ? 0.667f : 0.0f);
+
     const float baseCutoff    = apvts.getRawParameterValue ("cutoff")->load();
     const float emphasis      = apvts.getRawParameterValue ("emphasis")->load();
     const float filterContour = apvts.getRawParameterValue ("filter_contour")->load();
@@ -516,7 +540,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float driveGain = 1.0f + overloadAmt * 4.5f;
     const float polyScale = isPoly ? (1.0f / std::sqrt (static_cast<float> (activeVoiceCount))) : 1.0f;
 
-    const double lfoHz = 4.5;
+    const double lfoHz = static_cast<double> (lfoRateHz);
     const float effectiveModDepth = juce::jlimit (0.0f, 1.5f, modMix + modWheelAmount * 0.65f);
     const bool envGateActive = gateHeld || sustainPedalDown;
 
@@ -529,7 +553,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         lfoPhase += lfoHz / currentSampleRate;
         if (lfoPhase >= 1.0) lfoPhase -= 1.0;
 
-        // Envelope de filtro com Decay ativo mesmo com a tecla pressionada
         if (! envGateActive && filterEnvStage != EnvStage::idle)
             filterEnvStage = EnvStage::release;
 
@@ -670,10 +693,13 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         const float saturated = std::tanh (rawSynthSample * driveGain);
 
-        const float kbOffset = kbCtrlOn ? ((static_cast<float> (currentMidiNote) - 60.0f) * 24.0f) : 0.0f;
+        const float noteSemisFromC4 = static_cast<float> (currentMidiNote) - 60.0f;
+        const float trackingMult = std::pow (2.0f, (noteSemisFromC4 / 12.0f) * kbTrackAmount);
+        const float trackedBaseCutoff = baseCutoff * trackingMult;
+
         const float contourHz = filterEnvValue * filterContour * 5500.0f;
         const float lfoCutoffHz = filterModOn ? (lfoWave * effectiveModDepth * 2600.0f) : 0.0f;
-        const float finalCutoff = juce::jlimit (35.0f, 16000.0f, baseCutoff + kbOffset + contourHz + lfoCutoffHz);
+        const float finalCutoff = juce::jlimit (35.0f, 16000.0f, trackedBaseCutoff + contourHz + lfoCutoffHz);
 
         moogFilter.setCutoffFrequency (finalCutoff);
 
