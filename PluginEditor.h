@@ -42,12 +42,16 @@ private:
     using ComboAttachment  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
+    void buildCachedTextures();
     void setupKnob (juce::Slider& slider, juce::Label& label, const juce::String& text);
     void setupCombo (juce::ComboBox& box, juce::Label& label, const juce::String& text, const juce::StringArray& items);
     void setupToggle (juce::ToggleButton& btn, const juce::String& text, MiniMoonLookAndFeel::SwitchAccent accent);
 
     MiniJJMoogAudioProcessor& audioProcessor;
     MiniMoonLookAndFeel miniMoonLookAndFeel;
+
+    juce::Image cachedWoodTexture;
+    juce::Image cachedMetalTexture;
 
     // CONTROLLERS
     juce::Slider tuneSlider, glideSlider, pbRangeSlider, modMixSlider, lfoRateSlider;
