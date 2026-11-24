@@ -19,6 +19,7 @@ void MiniMoonLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int
     const float cx = static_cast<float> (x) + w * 0.5f;
     const float cy = static_cast<float> (y) + h * 0.5f;
 
+    // Marcas de escala radiais em branco nítido
     const int numTicks = 11;
     for (int i = 0; i < numTicks; ++i)
     {
@@ -26,41 +27,51 @@ void MiniMoonLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int
         const float ang = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle) - juce::MathConstants<float>::halfPi;
         const float r1 = baseR + 2.0f;
         const float r2 = baseR + 5.5f;
-        g.setColour (juce::Colour (0xfff2efe9));
+        g.setColour (juce::Colour (0xfff5f2eb));
         g.drawLine (cx + std::cos (ang) * r1,
                     cy + std::sin (ang) * r1,
                     cx + std::cos (ang) * r2,
                     cy + std::sin (ang) * r2, 1.15f);
     }
 
-    g.setColour (juce::Colour (0xaa050506));
-    g.fillEllipse (cx - baseR + 2.0f, cy - baseR + 3.0f, baseR * 2.0f, baseR * 2.0f);
+    // Sombra projetada 3D
+    g.setColour (juce::Colour (0xbb040405));
+    g.fillEllipse (cx - baseR + 2.5f, cy - baseR + 3.5f, baseR * 2.0f, baseR * 2.0f);
 
-    juce::ColourGradient bodyGrad (juce::Colour (0xff2b2926), cx, cy - baseR,
-                                   juce::Colour (0xff101012), cx, cy + baseR, false);
-    g.setGradientFill (bodyGrad);
+    // Saia cônica escura com anel metálico
+    juce::ColourGradient skirtGrad (juce::Colour (0xff3a3732), cx, cy - baseR,
+                                   juce::Colour (0xff121214), cx, cy + baseR, false);
+    g.setGradientFill (skirtGrad);
     g.fillEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f);
-    g.setColour (juce::Colour (0xff888d94));
+    g.setColour (juce::Colour (0xff989ea6));
     g.drawEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f, 1.1f);
 
+    // Tampa prateada com brilho cônico metálico (estilo BrokenMini / FB-02)
     const float capR = baseR * 0.68f;
-    juce::ColourGradient silverCap (juce::Colour (0xffe8ecf0), cx - capR * 0.35f, cy - capR * 0.35f,
-                                    juce::Colour (0xff8c9299), cx + capR * 0.45f, cy + capR * 0.45f, false);
+    juce::ColourGradient silverCap (juce::Colour (0xfff0f3f7), cx - capR * 0.4f, cy - capR * 0.4f,
+                                    juce::Colour (0xff7b818a), cx + capR * 0.45f, cy + capR * 0.45f, false);
     g.setGradientFill (silverCap);
     g.fillEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f);
 
-    g.setColour (juce::Colour (0xff3c4045));
-    g.drawEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f, 1.0f);
+    // Reflexo cônico diagonal característico
+    g.setColour (juce::Colour (0x45ffffff));
+    g.drawLine (cx - capR * 0.72f, cy - capR * 0.55f, cx + capR * 0.72f, cy + capR * 0.55f, 1.6f);
+    g.setColour (juce::Colour (0x28000000));
+    g.drawLine (cx - capR * 0.65f, cy + capR * 0.65f, cx + capR * 0.65f, cy - capR * 0.65f, 1.4f);
 
+    g.setColour (juce::Colour (0xff2a2d32));
+    g.drawEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f, 1.1f);
+
+    // Ponteiro indicador escuro de alto contraste
     const float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle)
                         - juce::MathConstants<float>::halfPi;
     const float px = cx + std::cos (angle) * (capR * 0.90f);
     const float py = cy + std::sin (angle) * (capR * 0.90f);
 
-    g.setColour (juce::Colour (0x88000000));
-    g.drawLine (cx + 1.0f, cy + 1.0f, px + 1.0f, py + 1.0f, 2.5f);
+    g.setColour (juce::Colour (0x88ffffff));
+    g.drawLine (cx + 0.8f, cy + 0.8f, px + 0.8f, py + 0.8f, 2.5f);
 
-    g.setColour (juce::Colour (0xff111214));
+    g.setColour (juce::Colour (0xff0d0e10));
     g.drawLine (cx, cy, px, py, 2.3f);
 }
 
@@ -98,11 +109,17 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
         const float btnX = bounds.getCentreX() - btnW * 0.5f;
         const float btnY = bounds.getY() + 2.0f;
 
+        // Cavidade afundada
+        g.setColour (juce::Colour (0xff070708));
+        g.fillRoundedRectangle (btnX - 1.0f, btnY - 1.0f, btnW + 2.0f, btnH + 2.0f, 3.0f);
+
         g.setColour (juce::Colour (0xff0b0b0c));
         g.fillRoundedRectangle (btnX + 1.0f, btnY + 1.0f, btnW, btnH, 2.5f);
 
         g.setColour (isOn ? activeCol : inactiveCol);
         g.fillRoundedRectangle (btnX, btnY, btnW, btnH, 2.5f);
+        g.setColour (juce::Colour (0x55ffffff));
+        g.drawLine (btnX + 1.5f, btnY + 1.2f, btnX + btnW - 1.5f, btnY + 1.2f, 0.9f);
 
         g.setColour (juce::Colour (0xff141416));
         g.drawRoundedRectangle (btnX, btnY, btnW, btnH, 2.5f, 1.0f);
@@ -125,6 +142,10 @@ void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
     const float btnH = 14.0f;
     const float btnX = bounds.getX() + 2.0f;
     const float btnY = bounds.getCentreY() - btnH * 0.5f;
+
+    // Cavidade 3D ao redor do switch
+    g.setColour (juce::Colour (0xff070708));
+    g.fillRoundedRectangle (btnX - 1.2f, btnY - 1.2f, btnW + 2.4f, btnH + 2.4f, 3.5f);
 
     g.setColour (juce::Colour (0xff0b0b0c));
     g.fillRoundedRectangle (btnX + 1.0f, btnY + 1.5f, btnW, btnH, 3.0f);
@@ -168,6 +189,7 @@ MiniJJMoogAudioProcessorEditor::MiniJJMoogAudioProcessorEditor (MiniJJMoogAudioP
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     setLookAndFeel (&miniMoonLookAndFeel);
+    buildCachedTextures();
 
     const juce::StringArray rangeChoices { "LO", "32'", "16'", "8'", "4'", "2'" };
     const juce::StringArray waveChoices  { "Tri", "Tri/Saw", "Saw", "Square", "Wide Pulse", "Narrow Pulse" };
@@ -297,13 +319,52 @@ MiniJJMoogAudioProcessorEditor::~MiniJJMoogAudioProcessorEditor()
     setLookAndFeel (nullptr);
 }
 
+void MiniJJMoogAudioProcessorEditor::buildCachedTextures()
+{
+    const int texW = 256;
+    const int texH = 256;
+
+    // Textura de madeira nogueira com veios orgânicos
+    cachedWoodTexture = juce::Image (juce::Image::RGB, texW, texH, true);
+    juce::Graphics wg (cachedWoodTexture);
+    juce::ColourGradient baseWood (juce::Colour (0xffb56c2c), 0.0f, 0.0f,
+                                   juce::Colour (0xff7e4617), 0.0f, static_cast<float> (texH), false);
+    wg.setGradientFill (baseWood);
+    wg.fillAll();
+
+    juce::Random woodRng (42);
+    for (int i = 0; i < 65; ++i)
+    {
+        const float y = woodRng.nextFloat() * static_cast<float> (texH);
+        const float alpha = 0.06f + woodRng.nextFloat() * 0.10f;
+        const bool darkGrain = woodRng.nextBool();
+        wg.setColour ((darkGrain ? juce::Colour (0xff3d1e08) : juce::Colour (0xffe09850)).withAlpha (alpha));
+        wg.drawLine (0.0f, y, static_cast<float> (texW), y + (woodRng.nextFloat() - 0.5f) * 3.0f, 1.1f);
+    }
+
+    // Textura metálica granulada fosca (estilo BrokenMini / FB-02)
+    cachedMetalTexture = juce::Image (juce::Image::RGB, texW, texH, true);
+    juce::Graphics mg (cachedMetalTexture);
+    mg.fillAll (juce::Colour (0xff232528));
+
+    juce::Random metalRng (108);
+    for (int i = 0; i < 2400; ++i)
+    {
+        const int gx = metalRng.nextInt (texW);
+        const int gy = metalRng.nextInt (texH);
+        const bool bright = metalRng.nextBool();
+        mg.setColour ((bright ? juce::Colour (0xffffffff) : juce::Colour (0xff000000)).withAlpha (0.045f));
+        mg.fillRect (gx, gy, 1, 1);
+    }
+}
+
 void MiniJJMoogAudioProcessorEditor::setupKnob (juce::Slider& slider, juce::Label& label, const juce::String& text)
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 48, 14);
     slider.setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xfff5f2eb));
-    slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0xff1b1a18));
-    slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colour (0xff6a6e75));
+    slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0xff191a1d));
+    slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colour (0xff787e86));
     addAndMakeVisible (slider);
 
     label.setText (text, juce::dontSendNotification);
@@ -316,7 +377,7 @@ void MiniJJMoogAudioProcessorEditor::setupKnob (juce::Slider& slider, juce::Labe
 void MiniJJMoogAudioProcessorEditor::setupCombo (juce::ComboBox& box, juce::Label& label, const juce::String& text, const juce::StringArray& items)
 {
     box.addItemList (items, 1);
-    box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff1d1c1a));
+    box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff1a1b1e));
     box.setColour (juce::ComboBox::textColourId, juce::Colour (0xfff5f2eb));
     box.setColour (juce::ComboBox::outlineColourId, juce::Colour (0xff888d94));
     addAndMakeVisible (box);
@@ -337,21 +398,41 @@ void MiniJJMoogAudioProcessorEditor::setupToggle (juce::ToggleButton& btn, const
 
 void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    juce::ColourGradient woodGrad (juce::Colour (0xffa86428), 0.0f, 0.0f,
-                                   juce::Colour (0xff784215), 0.0f, static_cast<float> (getHeight()), false);
-    g.setGradientFill (woodGrad);
-    g.fillAll();
-
-    g.setColour (juce::Colour (0xffc98242));
-    g.fillRect (0, 0, getWidth(), 5);
-    g.setColour (juce::Colour (0xff542c0c));
-    g.fillRect (0, getHeight() - 5, getWidth(), 5);
+    // Fundo em madeira com veios
+    if (cachedWoodTexture.isValid())
+    {
+        for (int ty = 0; ty < getHeight(); ty += cachedWoodTexture.getHeight())
+            for (int tx = 0; tx < getWidth(); tx += cachedWoodTexture.getWidth())
+                g.drawImageAt (cachedWoodTexture, tx, ty);
+    }
+    else
+    {
+        g.fillAll (juce::Colour (0xff9b5922));
+    }
 
     auto panel = getLocalBounds().reduced (14, 12).toFloat();
-    g.setColour (juce::Colour (0xff121214));
-    g.fillRoundedRectangle (panel, 5.0f);
 
-    g.setColour (juce::Colour (0xffb2b7be));
+    // Sombra projetada do painel metálico sobre a madeira
+    g.setColour (juce::Colour (0x88080604));
+    g.fillRoundedRectangle (panel.translated (2.0f, 3.0f), 5.0f);
+
+    // Painel metálico granulado
+    if (cachedMetalTexture.isValid())
+    {
+        g.saveState();
+        g.reduceClipRegion (panel.toNearestInt());
+        for (int py = panel.toNearestInt().getY(); py < panel.toNearestInt().getBottom(); py += cachedMetalTexture.getHeight())
+            for (int px = panel.toNearestInt().getX(); px < panel.toNearestInt().getRight(); px += cachedMetalTexture.getWidth())
+                g.drawImageAt (cachedMetalTexture, px, py);
+        g.restoreState();
+    }
+    else
+    {
+        g.setColour (juce::Colour (0xff232528));
+        g.fillRoundedRectangle (panel, 5.0f);
+    }
+
+    g.setColour (juce::Colour (0xffc0c5cc));
     g.drawRoundedRectangle (panel, 5.0f, 1.5f);
 
     const float screwX[2] = { panel.getX() + 9.0f, panel.getRight() - 9.0f };
@@ -386,7 +467,7 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
     {
         if (i > 0)
         {
-            g.setColour (juce::Colour (0xff484a4f));
+            g.setColour (juce::Colour (0xff4e5258));
             g.drawLine (colXArr[i], secStartY + 2.0f, colXArr[i], secStartY + secHeight - 4.0f, 1.0f);
         }
         g.setColour (juce::Colour (0xfff5f2eb));
@@ -399,6 +480,7 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
                     juce::Justification::centred);
     }
 
+    // Quadrilátero de alumínio escovado com escrita em preto ("Mini Moon" em duas linhas)
     const float outX = colXArr[4];
     const float outW = colWArr[4];
     const float badgeW = std::max (96.0f, outW - 22.0f);
@@ -406,12 +488,12 @@ void MiniJJMoogAudioProcessorEditor::paint (juce::Graphics& g)
     const float badgeX = outX + (outW - badgeW) * 0.5f;
     const float badgeY = panel.getBottom() - badgeH - 12.0f;
 
-    juce::ColourGradient brushedGrad (juce::Colour (0xffdfe4e8), badgeX, badgeY,
-                                      juce::Colour (0xff9aa0a8), badgeX, badgeY + badgeH, false);
+    juce::ColourGradient brushedGrad (juce::Colour (0xffe6eaee), badgeX, badgeY,
+                                      juce::Colour (0xff9da3ab), badgeX, badgeY + badgeH, false);
     g.setGradientFill (brushedGrad);
     g.fillRect (badgeX, badgeY, badgeW, badgeH);
 
-    g.setColour (juce::Colour (0x30ffffff));
+    g.setColour (juce::Colour (0x35ffffff));
     for (float yLine = badgeY + 3.0f; yLine < badgeY + badgeH - 2.0f; yLine += 3.0f)
         g.drawLine (badgeX + 2.0f, yLine, badgeX + badgeW - 2.0f, yLine, 0.6f);
 
@@ -527,7 +609,7 @@ void MiniJJMoogAudioProcessorEditor::resized()
         placeKnob  (overloadSlider, overloadLabel, x0, y0 + kh * 3, kw, kh);
     }
 
-    // 4. MODIFIERS (3 botoes horizontais lado a lado: 1/3, 2/3, FULL)
+    // 4. MODIFIERS (3 botões horizontais lado a lado: 1/3, 2/3, FULL)
     {
         const int x0 = colX[3];
         const int w0 = colW[3];
