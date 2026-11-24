@@ -15,76 +15,112 @@ void MiniMoonLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int
 {
     const float w = static_cast<float> (width);
     const float h = static_cast<float> (height);
-    const float baseR = std::max (8.0f, std::min (w, h) * 0.40f);
+    const float baseR = std::max (9.0f, std::min (w, h) * 0.42f);
     const float cx = static_cast<float> (x) + w * 0.5f;
     const float cy = static_cast<float> (y) + h * 0.5f;
 
-    // Pontos/marcas de escala ao redor do knob
-    const int numTicks = 11;
-    for (int i = 0; i < numTicks; ++i)
-    {
-        const float t = static_cast<float> (i) / static_cast<float> (numTicks - 1);
-        const float ang = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle) - juce::MathConstants<float>::halfPi;
-        const float r1 = baseR + 2.2f;
-        const float r2 = baseR + 5.2f;
-        g.setColour (juce::Colour (0xffeae6de));
-        g.drawLine (cx + std::cos (ang) * r1,
-                    cy + std::sin (ang) * r1,
-                    cx + std::cos (ang) * r2,
-                    cy + std::sin (ang) * r2, 1.15f);
-    }
-
-    // Sombra projetada sob o knob
-    g.setColour (juce::Colour (0xcc020203));
-    g.fillEllipse (cx - baseR + 2.0f, cy - baseR + 3.0f, baseR * 2.0f, baseR * 2.0f);
-
-    // Corpo preto do knob com gomos sutis em volta
-    g.setColour (juce::Colour (0xff121316));
-    g.fillEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f);
-
-    const int numLobes = 8;
-    for (int l = 0; l < numLobes; ++l)
-    {
-        const float lobeAng = (static_cast<float> (l) / static_cast<float> (numLobes)) * juce::MathConstants<float>::twoPi;
-        const float lx = cx + std::cos (lobeAng) * (baseR * 0.78f);
-        const float ly = cy + std::sin (lobeAng) * (baseR * 0.78f);
-        g.setColour (juce::Colour (0xff1f2126));
-        g.fillEllipse (lx - baseR * 0.22f, ly - baseR * 0.22f, baseR * 0.44f, baseR * 0.44f);
-    }
-
-    g.setColour (juce::Colour (0xff585d64));
-    g.drawEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f, 1.0f);
-
-    // Tampa metálica prateada com ranhuras concêntricas no estilo da foto
-    const float capR = baseR * 0.65f;
-    juce::ColourGradient silverCap (juce::Colour (0xfff4f7fa), cx, cy - capR,
-                                    juce::Colour (0xff8c929b), cx, cy + capR, false);
-    g.setGradientFill (silverCap);
-    g.fillEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f);
-
-    for (float ringScale = 0.25f; ringScale <= 0.82f; ringScale += 0.19f)
-    {
-        const float rr = capR * ringScale;
-        g.setColour (juce::Colour (0x36181a1f));
-        g.drawEllipse (cx - rr, cy - rr, rr * 2.0f, rr * 2.0f, 0.8f);
-    }
-
-    g.setColour (juce::Colour (0xff23262b));
-    g.drawEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f, 1.1f);
-
-    // Ponteiro escuro + ponto branco bem marcado na borda
     const float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle)
                         - juce::MathConstants<float>::halfPi;
-    const float px = cx + std::cos (angle) * (capR * 0.84f);
-    const float py = cy + std::sin (angle) * (capR * 0.84f);
 
-    g.setColour (juce::Colour (0xff0c0d0f));
-    g.drawLine (cx, cy, px, py, 2.2f);
+    // 1. Sombra projetada suave sob o knob no painel preto
+    g.setColour (juce::Colour (0xd0020204));
+    g.fillEllipse (cx - baseR + 2.0f, cy - baseR + 3.0f, baseR * 2.0f, baseR * 2.0f);
 
-    g.setColour (juce::Colour (0xffffffff));
-    g.fillEllipse (px - 2.5f, py - 2.5f, 5.0f, 5.0f);
-    g.setColour (juce::Colour (0xff101114));
-    g.drawEllipse (px - 2.5f, py - 2.5f, 5.0f, 5.0f, 0.9f);
+    // 2. Saia circular preta na base com brilho sutil na borda
+    juce::ColourGradient skirtGrad (juce::Colour (0xff26282d), cx - baseR * 0.3f, cy - baseR * 0.6f,
+                                    juce::Colour (0xff0b0c0e), cx + baseR * 0.3f, cy + baseR * 0.7f, false);
+    g.setGradientFill (skirtGrad);
+    g.fillEllipse (cx - baseR, cy - baseR, baseR * 2.0f, baseR * 2.0f);
+
+    g.setColour (juce::Colour (0xff4e535c));
+    g.drawEllipse (cx - baseR + 0.5f, cy - baseR + 0.5f, (baseR - 0.5f) * 2.0f, (baseR - 0.5f) * 2.0f, 0.85f);
+
+    // 3. Corpo canelado / estriado que gira com o valor do slider
+    const float bodyR = baseR * 0.82f;
+    const float capR  = baseR * 0.63f;
+    const int numRibs = 28;
+
+    juce::Path flutedPath;
+    const int totalSteps = numRibs * 4;
+    for (int i = 0; i <= totalSteps; ++i)
+    {
+        const float frac = static_cast<float> (i) / static_cast<float> (totalSteps);
+        const float a = angle + frac * juce::MathConstants<float>::twoPi;
+        const float ribWave = std::cos (frac * static_cast<float> (numRibs) * juce::MathConstants<float>::twoPi);
+        const float r = bodyR - (0.5f - 0.5f * ribWave) * (bodyR * 0.11f);
+        const float px = cx + std::cos (a) * r;
+        const float py = cy + std::sin (a) * r;
+
+        if (i == 0)
+            flutedPath.startNewSubPath (px, py);
+        else
+            flutedPath.lineTo (px, py);
+    }
+    flutedPath.closeSubPath();
+
+    juce::ColourGradient bodyGrad (juce::Colour (0xff2e3138), cx - bodyR * 0.45f, cy - bodyR * 0.45f,
+                                   juce::Colour (0xff0a0b0d), cx + bodyR * 0.45f, cy + bodyR * 0.45f, false);
+    g.setGradientFill (bodyGrad);
+    g.fillPath (flutedPath);
+
+    g.setColour (juce::Colour (0xff191b1f));
+    g.strokePath (flutedPath, juce::PathStrokeType (1.0f));
+
+    // 4. Tampa superior de aluminio torneado com brilho conico e aneis concentricos
+    g.saveState();
+    juce::Path capClip;
+    capClip.addEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f);
+    g.reduceClipRegion (capClip);
+
+    g.setColour (juce::Colour (0xffa6acb5));
+    g.fillEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f);
+
+    const int numSectors = 48;
+    for (int s = 0; s < numSectors; ++s)
+    {
+        const float a0 = (static_cast<float> (s) / static_cast<float> (numSectors)) * juce::MathConstants<float>::twoPi;
+        const float a1 = (static_cast<float> (s + 1) / static_cast<float> (numSectors)) * juce::MathConstants<float>::twoPi;
+        const float midA = 0.5f * (a0 + a1);
+
+        // Brilho conico em leque duplo (efeito metal torneado visto na foto)
+        const float cone = 0.5f + 0.5f * std::cos (2.0f * (midA - 0.65f));
+        const juce::Colour secCol = juce::Colour (0xff6f757e).interpolatedWith (juce::Colour (0xfff5f7fa), std::pow (cone, 1.35f));
+
+        juce::Path sector;
+        sector.startNewSubPath (cx, cy);
+        sector.lineTo (cx + std::cos (a0) * (capR * 1.15f), cy + std::sin (a0) * (capR * 1.15f));
+        sector.lineTo (cx + std::cos (a1) * (capR * 1.15f), cy + std::sin (a1) * (capR * 1.15f));
+        sector.closeSubPath();
+
+        g.setColour (secCol);
+        g.fillPath (sector);
+    }
+
+    // Sulcos concentricos finos na tampa prateada
+    for (float ringR = 2.0f; ringR < capR - 0.6f; ringR += 1.5f)
+    {
+        g.setColour (juce::Colour (0x24121418));
+        g.drawEllipse (cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f, 0.65f);
+    }
+    g.restoreState();
+
+    // Borda escura em volta da tampa prateada
+    g.setColour (juce::Colour (0xff121316));
+    g.drawEllipse (cx - capR, cy - capR, capR * 2.0f, capR * 2.0f, 1.15f);
+
+    // 5. Ponto branco indicador na borda da tampa prateada (como na foto)
+    const float dotR = std::max (1.9f, capR * 0.13f);
+    const float dotDist = capR * 0.72f;
+    const float dx = cx + std::cos (angle) * dotDist;
+    const float dy = cy + std::sin (angle) * dotDist;
+
+    g.setColour (juce::Colour (0x99000000));
+    g.fillEllipse (dx - dotR + 0.7f, dy - dotR + 0.9f, dotR * 2.0f, dotR * 2.0f);
+
+    g.setColour (juce::Colour (0xfffaf8f5));
+    g.fillEllipse (dx - dotR, dy - dotR, dotR * 2.0f, dotR * 2.0f);
+    g.setColour (juce::Colour (0xff23262b));
+    g.drawEllipse (dx - dotR, dy - dotR, dotR * 2.0f, dotR * 2.0f, 0.7f);
 }
 
 void MiniMoonLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
@@ -334,7 +370,6 @@ void MiniJJMoogAudioProcessorEditor::buildCachedTextures()
     const int texW = 256;
     const int texH = 256;
 
-    // Moldura em madeira nogueira com veios
     cachedWoodTexture = juce::Image (juce::Image::RGB, texW, texH, true);
     juce::Graphics wg (cachedWoodTexture);
     juce::ColourGradient baseWood (juce::Colour (0xffb0682a), 0.0f, 0.0f,
@@ -352,7 +387,6 @@ void MiniJJMoogAudioProcessorEditor::buildCachedTextures()
         wg.drawLine (0.0f, y, static_cast<float> (texW), y + (woodRng.nextFloat() - 0.5f) * 3.0f, 1.1f);
     }
 
-    // Painel preto clássico sólido
     cachedMetalTexture = juce::Image (juce::Image::RGB, texW, texH, true);
     juce::Graphics mg (cachedMetalTexture);
     mg.fillAll (juce::Colour (0xff101113));
