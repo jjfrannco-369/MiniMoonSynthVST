@@ -503,11 +503,12 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const bool  kbTrk2        = apvts.getRawParameterValue ("kb_trk_2")->load() > 0.5f;
     const bool  kbTrk3        = apvts.getRawParameterValue ("kb_trk_3")->load() > 0.5f;
 
-    float kbTrackAmount = 0.0f;
-    if (kbTrk3)
+    // Soma das chaves de Keyboard Tracking (1/3 = 33.3%, 2/3 = 66.7%, FULL = 100%)
+    float kbTrackAmount = (kbTrk1 ? 0.333f : 0.0f)
+                        + (kbTrk2 ? 0.667f : 0.0f)
+                        + (kbTrk3 ? 0.500f : 0.0f);
+    if (kbTrk3 && ! kbTrk1 && ! kbTrk2)
         kbTrackAmount = 1.0f;
-    else
-        kbTrackAmount = (kbTrk1 ? 0.333f : 0.0f) + (kbTrk2 ? 0.667f : 0.0f);
 
     const float baseCutoff    = apvts.getRawParameterValue ("cutoff")->load();
     const float emphasis      = apvts.getRawParameterValue ("emphasis")->load();
@@ -536,7 +537,10 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     const float bendSmoothCoeff = secondsToCoeff (0.018f, currentSampleRate);
 
-    moogFilter.setResonance (0.707f + emphasis * 6.5f);
+    // Ressonancia mais expressiva e musical com o filtro
+    const float resCurve = 0.707f + std::pow (emphasis, 1.15f) * 8.2f;
+    moogFilter.setResonance (resCurve);
+
     const float driveGain = 1.0f + overloadAmt * 4.5f;
     const float polyScale = isPoly ? (1.0f / std::sqrt (static_cast<float> (activeVoiceCount))) : 1.0f;
 
@@ -693,13 +697,16 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         const float saturated = std::tanh (rawSynthSample * driveGain);
 
-        const float noteSemisFromC4 = static_cast<float> (currentMidiNote) - 60.0f;
-        const float trackingMult = std::pow (2.0f, (noteSemisFromC4 / 12.0f) * kbTrackAmount);
+        // Keyboard Tracking com pivo no C2 (MIDI 36) e acompanhamento do glide
+        const float activePitchForTracking = isPoly ? static_cast<float> (currentMidiNote)
+                                                    : static_cast<float> (currentMidiPitch);
+        const float semisAboveLowC = std::max (0.0f, activePitchForTracking - 36.0f);
+        const float trackingMult = std::pow (2.0f, (semisAboveLowC / 12.0f) * kbTrackAmount);
         const float trackedBaseCutoff = baseCutoff * trackingMult;
 
         const float contourHz = filterEnvValue * filterContour * 5500.0f;
         const float lfoCutoffHz = filterModOn ? (lfoWave * effectiveModDepth * 2600.0f) : 0.0f;
-        const float finalCutoff = juce::jlimit (35.0f, 16000.0f, trackedBaseCutoff + contourHz + lfoCutoffHz);
+        const float finalCutoff = juce::jlimit (35.0f, 18000.0f, trackedBaseCutoff + contourHz + lfoCutoffHz);
 
         moogFilter.setCutoffFrequency (finalCutoff);
 
