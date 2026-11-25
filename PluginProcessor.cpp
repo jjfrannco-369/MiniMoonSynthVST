@@ -348,6 +348,11 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const bool legatoMode = apvts.getRawParameterValue ("legato_on")->load() > 0.5f;
     const bool retriggerFilter = apvts.getRawParameterValue ("retrigger_on")->load() > 0.5f;
 
+    int polyHeldCount = 0;
+    for (int i = 0; i < activeVoiceCount; ++i)
+        if (voices[i].noteKeyHeld)
+            ++polyHeldCount;
+
     for (const auto metadata : midiMessages)
     {
         const auto msg = metadata.getMessage();
@@ -358,8 +363,15 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
             if (isPoly)
             {
+                const bool hadPolyHeld = (polyHeldCount > 0) || sustainPedalDown;
                 triggerPolyNoteOn (noteNum, vel, activeVoiceCount, legatoMode);
-                if (retriggerFilter)
+                polyHeldCount = 0;
+                for (int i = 0; i < activeVoiceCount; ++i)
+                    if (voices[i].noteKeyHeld)
+                        ++polyHeldCount;
+
+                gateHeld = (polyHeldCount > 0);
+                if (retriggerFilter || ! hadPolyHeld)
                     filterEnvStage = EnvStage::attack;
             }
             else
@@ -403,6 +415,16 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             if (isPoly)
             {
                 triggerPolyNoteOff (noteNum);
+                polyHeldCount = 0;
+                for (int i = 0; i < activeVoiceCount; ++i)
+                    if (voices[i].noteKeyHeld)
+                        ++polyHeldCount;
+
+                if (polyHeldCount == 0 && ! sustainPedalDown)
+                {
+                    gateHeld = false;
+                    filterEnvStage = EnvStage::release;
+                }
             }
             else
             {
@@ -447,7 +469,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                             v.active = false;
                     }
 
-                    if (heldNotes.empty())
+                    if (heldNotes.empty() && polyHeldCount == 0)
                     {
                         gateHeld = false;
                         filterEnvStage = EnvStage::release;
@@ -503,7 +525,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const bool  kbTrk2        = apvts.getRawParameterValue ("kb_trk_2")->load() > 0.5f;
     const bool  kbTrk3        = apvts.getRawParameterValue ("kb_trk_3")->load() > 0.5f;
 
-    // Soma das chaves de Keyboard Tracking (1/3 = 33.3%, 2/3 = 66.7%, FULL = 100%)
     float kbTrackAmount = (kbTrk1 ? 0.333f : 0.0f)
                         + (kbTrk2 ? 0.667f : 0.0f)
                         + (kbTrk3 ? 0.500f : 0.0f);
@@ -537,7 +558,6 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     const float bendSmoothCoeff = secondsToCoeff (0.018f, currentSampleRate);
 
-    // Ressonancia mais expressiva e musical com o filtro
     const float resCurve = 0.707f + std::pow (emphasis, 1.15f) * 8.2f;
     moogFilter.setResonance (resCurve);
 
@@ -547,6 +567,8 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const double lfoHz = static_cast<double> (lfoRateHz);
     const float effectiveModDepth = juce::jlimit (0.0f, 1.5f, modMix + modWheelAmount * 0.65f);
     const bool envGateActive = gateHeld || sustainPedalDown;
+
+    static float feedbackSample = 0.0f;
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
@@ -610,6 +632,9 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         pinkB6 = white * 0.115926f;
         const float noiseSample = (noiseType == 1) ? pink : white;
 
+        // Simulacao do jumper classico da saida para o External Input (EXT IN)
+        const float extFeedbackSat = std::tanh (feedbackSample * (1.2f + extVol * 3.5f)) * (extVol * 0.75f);
+
         float rawSynthSample = 0.0f;
 
         if (! isPoly)
@@ -647,7 +672,7 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             if (oscPhases[1] >= 1.0) oscPhases[1] -= 1.0;
 
             const float osc3Mix = osc3CtrlOn ? 0.0f : (out3 * v3);
-            rawSynthSample = (out1 * v1 + out2 * v2 + osc3Mix + noiseSample * noiseVol + extVol * 0.0f) * 0.45f * ampLevel * noteVelocity;
+            rawSynthSample = (out1 * v1 + out2 * v2 + osc3Mix + noiseSample * noiseVol + extFeedbackSat) * 0.45f * ampLevel * noteVelocity;
         }
         else
         {
@@ -690,14 +715,13 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                 if (v.phases[2] >= 1.0) v.phases[2] -= 1.0;
 
                 const float osc3Mix = osc3CtrlOn ? 0.0f : (wOsc3 * v3);
-                const float voiceMix = (wOsc1 * v1 + wOsc2 * v2 + osc3Mix + noiseSample * noiseVol * 0.25f) * 0.45f;
+                const float voiceMix = (wOsc1 * v1 + wOsc2 * v2 + osc3Mix + noiseSample * noiseVol * 0.25f + extFeedbackSat * 0.35f) * 0.45f;
                 rawSynthSample += voiceMix * voiceAmp * v.velocity * polyScale;
             }
         }
 
         const float saturated = std::tanh (rawSynthSample * driveGain);
 
-        // Keyboard Tracking com pivo no C2 (MIDI 36) e acompanhamento do glide
         const float activePitchForTracking = isPoly ? static_cast<float> (currentMidiNote)
                                                     : static_cast<float> (currentMidiPitch);
         const float semisAboveLowC = std::max (0.0f, activePitchForTracking - 36.0f);
@@ -711,12 +735,18 @@ void MiniJJMoogAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         moogFilter.setCutoffFrequency (finalCutoff);
 
         const float outputGain = mainOutOn ? masterVol : 0.0f;
+        float sampleOutForFeedback = 0.0f;
 
         for (int ch = 0; ch < numChannels; ++ch)
         {
             const float filtered = moogFilter.processSample (static_cast<size_t> (ch), saturated);
-            buffer.setSample (ch, sample, filtered * outputGain);
+            const float outSample = filtered * outputGain;
+            buffer.setSample (ch, sample, outSample);
+            if (ch == 0)
+                sampleOutForFeedback = outSample;
         }
+
+        feedbackSample = sampleOutForFeedback;
     }
 }
 
